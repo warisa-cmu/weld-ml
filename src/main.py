@@ -63,17 +63,15 @@ def _(genVal, n, np):
     periods = genVal(20, 40, n)
     shifts = genVal(0, 100, n)
     amps = genVal(0, 3, n)
-    taus = genVal(200, 300, n)
+    taus = np.floor(genVal(200, 300, n))
     bases = genVal(0, 10, n)
 
     tsArr = []
-    paramsArr = []
 
     for period, shift, amp, tau, base in zip(periods, shifts, amps, taus, bases):
         params = dict(period=period, shift=shift, amp=amp, tau=tau, base=base)
         ts = genTimeSeries(params)
         tsArr.append(ts)
-        paramsArr.append(params)
     return (
         amp,
         amps,
@@ -81,7 +79,6 @@ def _(genVal, n, np):
         bases,
         genTimeSeries,
         params,
-        paramsArr,
         period,
         periods,
         shift,
@@ -104,13 +101,28 @@ def _(plt, tsArr):
 
 
 @app.cell
-def _(m_val_1, m_val_2, m_val_3, paramsArr, pd, tsArr):
+def _(
+    amps,
+    bases,
+    m_val_1,
+    m_val_2,
+    m_val_3,
+    pd,
+    periods,
+    shifts,
+    taus,
+    tsArr,
+):
     data = {
         "m1": m_val_1,
         "m2": m_val_2,
         "m3": m_val_3,
         "ts": tsArr,
-        "params": paramsArr
+        "_period": periods,
+        "_shift": shifts,
+        "_amp": amps,
+        "_tau": taus,
+        "_base": bases,
     }
 
     dfData = pd.DataFrame(data=data)
@@ -120,14 +132,32 @@ def _(m_val_1, m_val_2, m_val_3, paramsArr, pd, tsArr):
 
 @app.cell
 def _(dfData):
-    def cal_y(row):
+    dfDataStats = dfData.describe()
+    dfDataStats
+    return (dfDataStats,)
 
-        y1 = row["m1"] 
-    
+
+@app.cell
+def _(dfData, dfDataStats, pd):
+    def cal_y(row, stats):
+        m1_mean = stats.loc["mean", "m1"]
+        m2_mean = stats.loc["mean", "m2"]
+        m3_mean = stats.loc["mean", "m3"]
+        period_mean = stats.loc["mean", "_period"]
+        y1 = (row["m1"]/m1_mean + row["_period"]/period_mean * 2) * 20
+        y2 = (row["m2"]/m2_mean)  / (row["_period"]/period_mean)
+        y3 = ((row["m3"]/m3_mean) - (row["_period"]/period_mean * 2)) * -100
+        return pd.Series(data=[y1, y2, y3], index=["y1", "y2", "y3"])
         pass
 
-    dfData.apply(cal_y, axis=1)
+    dfData[["y1", "y2", "y3"]] = dfData.apply(lambda row: cal_y(row, dfDataStats), axis=1)
+    dfData
     return (cal_y,)
+
+
+@app.cell
+def _():
+    return
 
 
 if __name__ == "__main__":
