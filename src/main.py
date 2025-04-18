@@ -16,13 +16,8 @@ def _():
 @app.cell
 def _(pd):
     df = pd.read_csv("src/data/test_no_23.csv")
-    return (df,)
-
-
-@app.cell
-def _(df):
     df
-    return
+    return (df,)
 
 
 @app.cell
@@ -71,11 +66,14 @@ def _(genVal, n, np):
     taus = genVal(200, 300, n)
     bases = genVal(0, 10, n)
 
-    tss = []
+    tsArr = []
+    paramsArr = []
+
     for period, shift, amp, tau, base in zip(periods, shifts, amps, taus, bases):
         params = dict(period=period, shift=shift, amp=amp, tau=tau, base=base)
         ts = genTimeSeries(params)
-        tss.append(ts)
+        tsArr.append(ts)
+        paramsArr.append(params)
     return (
         amp,
         amps,
@@ -83,6 +81,7 @@ def _(genVal, n, np):
         bases,
         genTimeSeries,
         params,
+        paramsArr,
         period,
         periods,
         shift,
@@ -90,23 +89,45 @@ def _(genVal, n, np):
         tau,
         taus,
         ts,
-        tss,
+        tsArr,
     )
 
 
 @app.cell
-def _(plt, tss):
+def _(plt, tsArr):
     for i in range(10):
-        x = tss[i][0]
-        y = tss[i][1]
+        x = tsArr[i][0]
+        y = tsArr[i][1]
         plt.plot(x,y)
     plt.show()
     return i, x, y
 
 
 @app.cell
-def _():
-    return
+def _(m_val_1, m_val_2, m_val_3, paramsArr, pd, tsArr):
+    data = {
+        "m1": m_val_1,
+        "m2": m_val_2,
+        "m3": m_val_3,
+        "ts": tsArr,
+        "params": paramsArr
+    }
+
+    dfData = pd.DataFrame(data=data)
+    dfData
+    return data, dfData
+
+
+@app.cell
+def _(dfData):
+    def cal_y(row):
+
+        y1 = row["m1"] 
+    
+        pass
+
+    dfData.apply(cal_y, axis=1)
+    return (cal_y,)
 
 
 if __name__ == "__main__":
