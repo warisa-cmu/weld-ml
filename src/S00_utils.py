@@ -1,5 +1,20 @@
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error, r2_score
+import numpy as np
+
+def genVal(low, high, n):
+    return np.random.uniform(low=low, high=high, size=(n,))
+
+def genTimeSeries(params):
+    tau = params.get("tau")
+    period = params.get("period")
+    shift = params.get("shift")
+    amp = params.get("amp")
+    base = params.get("base")
+    t = np.arange(tau)
+    s = amp * np.sin(2 * np.pi * t / period + shift) + base
+    return t, s
+
 
 def _residual(ax, y_pred, y, title, color="steelblue"):
     ax.scatter(y_pred, y_pred - y, c=color, marker="o", edgecolor="white", s=70)
