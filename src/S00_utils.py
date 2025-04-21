@@ -1,9 +1,31 @@
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error, r2_score
 import numpy as np
+import pickle
+import datetime
+
+
+def aTime(name):
+    s = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    nameOut = f"{name}__{s}"
+    print(nameOut)
+    return nameOut
+
+
+def savePickle(filepath, data):
+    with open(filepath, "wb") as handle:
+        pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def loadPickle(filepath):
+    with open(filepath, "rb") as handle:
+        data = pickle.load(handle)
+    return data
+
 
 def genVal(low, high, n):
     return np.random.uniform(low=low, high=high, size=(n,))
+
 
 def genTimeSeries(params):
     tau = params.get("tau")
