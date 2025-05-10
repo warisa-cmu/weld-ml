@@ -74,7 +74,7 @@ class VariableSelectionNetwork(nn.Module):
 
 
 batch_size = 32
-num_inputs = 5
+num_inputs = 1
 input_dim = 8
 hidden_dim = 16
 context_dim = 4
