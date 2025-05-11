@@ -279,6 +279,7 @@ class VariableSelectionNetwork(nn.Module):
             additional_context=self.additional_context,
         )
 
+        # NR: output_size must be the number of features
         self.per_feature_grn = nn.ModuleList(
             [
                 GatedResidualNetwork(
