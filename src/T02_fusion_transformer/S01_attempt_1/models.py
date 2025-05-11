@@ -3,67 +3,56 @@ import torch
 import torch.nn.functional as F
 
 
-class MultiModalRegressionModel(nn.Module):
+class MyModel(nn.Module):
     def __init__(
         self,
         num_tabular_features,
-        cnn_input_channels,
-        lstm_input_size,
-        lstm_hidden_size,
-        lstm_num_layers,
         output_size,
+        embedding_size,
     ):
         super().__init__()
+
+        self.num_tabular_features = num_tabular_features
+
+        # Embeddeding layer
+        self.embedding_size = embedding_size
+        self.embedders_tab_vars = nn.ModuleList(
+            [
+                nn.Linear(1, self.embedding_size)
+                for _ in range(self.num_tabular_features)
+            ]
+        )
+
+        self.vsn_tab_vars = VariableSelectionNetwork(
+            num_inputs=num_tabular_features,
+            input_dim=self.embedding_size,
+            hidden_dim=num_tabular_features,  # This is the output size
+        )
 
         # MLP for tabular data
         self.mlp = nn.Sequential(
             nn.Linear(num_tabular_features, 64), nn.ReLU(), nn.Linear(64, 32), nn.ReLU()
         )
 
-        # CNN for image data
-        self.cnn = nn.Sequential(
-            nn.Conv2d(cnn_input_channels, 16, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-            nn.Conv2d(16, 32, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-            nn.AdaptiveAvgPool2d((4, 4)),
-            nn.Flatten(),
-        )
-        # Calculate the flattened CNN output size given your image dimensions
-        self.cnn_output_size = 32 * 4 * 4  # From nn.AdaptiveAvgPool2d((4, 4))
-
-        # LSTM for time series data
-        self.lstm = nn.LSTM(
-            input_size=lstm_input_size,
-            hidden_size=lstm_hidden_size,
-            num_layers=lstm_num_layers,
-            batch_first=True,
-        )
-        self.lstm_fc = nn.Linear(lstm_hidden_size, 32)
-
-        # Final regression head
-        fusion_dim = 32 + self.cnn_output_size + 32
         self.regressor = nn.Sequential(
-            nn.Linear(fusion_dim, 64), nn.ReLU(), nn.Linear(64, output_size)
+            nn.Linear(32, 64), nn.ReLU(), nn.Linear(64, output_size)
         )
 
-    def forward(self, x_tab, x_img, x_seq):
+    def forward(self, x_tab):
         # x_tab: (batch, num_tabular_features)
-        # x_img: (batch, channels, height, width)
-        # x_seq: (batch, seq_len, lstm_input_size)
 
-        tab_out = self.mlp(x_tab)
-        img_out = self.cnn(x_img)
-        lstm_out, (lstm_hidden, c_n) = self.lstm(x_seq)
-        lstm_last = lstm_hidden[-1]  # Return last hidden state of last layer
-        lstm_feat = F.relu(self.lstm_fc(lstm_last))
+        tab_out = torch.stack(
+            [
+                self.embedders_tab_vars[i](x_tab[Ellipsis, i].unsqueeze(-1))
+                for i in range(0, self.num_tabular_features)
+            ],
+            axis=-2,
+        )  # (batch, num_features, embedding_size)
 
-        # Concatenate all features
-        combined = torch.cat([tab_out, img_out, lstm_feat], dim=1)
-        output = self.regressor(combined)
-        return output.squeeze(-1)
+        tab_out, vsn_weights = self.vsn_tab_vars(tab_out)
+        tab_out = self.mlp(tab_out)
+        output = self.regressor(tab_out)
+        return output.squeeze(-1), vsn_weights
 
 
 class GatedResidualNetwork(nn.Module):
