@@ -7,122 +7,104 @@ class MyModel(nn.Module):
     def __init__(
         self,
         num_tabular_features,
-        output_size,
-        embedding_size,
+        ts_embedding_size,
+        num_ts_features,
+        lstm_num_layers,
+        lstm_dropout,
+        attn_n_head,
+        num_output,
     ):
         super().__init__()
 
         self.num_tabular_features = num_tabular_features
+        self.num_ts_features = num_ts_features
+        self.lstm_num_layers = lstm_num_layers
+        self.lstm_dropout = lstm_dropout
+        self.attn_n_head = attn_n_head
+        self.num_output = num_output
 
-        # Embeddeding layer
-        self.embedding_size = embedding_size
-        self.embedders_tab_vars = nn.ModuleList(
-            [
-                nn.Linear(1, self.embedding_size)
-                for _ in range(self.num_tabular_features)
-            ]
+        # Embeddeding layer (time series)
+        self.ts_embedding_size = ts_embedding_size
+        self.ts_embedders = nn.ModuleList(
+            [nn.Linear(1, self.ts_embedding_size) for _ in range(self.num_ts_features)]
         )
 
-        self.vsn_tab_vars = VariableSelectionNetwork(
-            num_inputs=num_tabular_features,
-            input_dim=self.embedding_size,
-            hidden_dim=num_tabular_features,  # This is the output size
+        self.lstm = nn.LSTM(
+            input_size=self.ts_embedding_size * self.num_ts_features,
+            hidden_size=self.ts_embedding_size,  # This will be the output size
+            num_layers=self.lstm_num_layers,
+            batch_first=True,
+            dropout=self.lstm_dropout,
+        )
+
+        self.emb_seeder = nn.Embedding(self.num_output, self.ts_embedding_size)
+
+        self.imh_attn = InterpretableMultiHeadAttention(
+            n_head=self.attn_n_head,
+            d_model=self.ts_embedding_size,
+            dropout=self.lstm_dropout,
+        )
+
+        # MLP to process each output
+        self.mlps_ts = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Linear(ts_embedding_size, 64),
+                    nn.ReLU(),
+                    nn.Linear(64, 32),
+                    nn.ReLU(),
+                )
+                for _ in range(0, num_output)
+            ]
         )
 
         # MLP for tabular data
-        self.mlp = nn.Sequential(
-            nn.Linear(num_tabular_features, 64), nn.ReLU(), nn.Linear(64, 32), nn.ReLU()
+        self.mlp_tab = nn.Sequential(
+            nn.Linear(num_tabular_features, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
         )
 
-        self.regressor = nn.Sequential(
-            nn.Linear(32, 64), nn.ReLU(), nn.Linear(64, output_size)
-        )
-
-    def forward(self, x_tab):
-        # x_tab: (batch, num_tabular_features)
-
-        tab_out = torch.stack(
+        self.regs = nn.ModuleList(
             [
-                self.embedders_tab_vars[i](x_tab[Ellipsis, i].unsqueeze(-1))
-                for i in range(0, self.num_tabular_features)
-            ],
-            axis=-2,
-        )  # (batch, num_features, embedding_size)
-
-        tab_out, vsn_weights = self.vsn_tab_vars(tab_out)
-        tab_out = self.mlp(tab_out)
-        output = self.regressor(tab_out)
-        return output.squeeze(-1), vsn_weights
-
-
-class GatedResidualNetwork(nn.Module):
-    def __init__(
-        self, input_dim, hidden_dim, output_dim, context_dim=None, dropout=0.1
-    ):
-        super().__init__()
-        self.linear1 = nn.Linear(input_dim, hidden_dim)
-        self.context_linear = (
-            nn.Linear(context_dim, hidden_dim) if context_dim is not None else None
-        )
-        self.elu = nn.ELU()
-        self.linear2 = nn.Linear(hidden_dim, output_dim)
-        self.dropout = nn.Dropout(dropout)
-        self.gate = nn.Linear(output_dim, output_dim)
-        self.sigmoid = nn.Sigmoid()
-        self.skip = (
-            nn.Linear(input_dim, output_dim) if input_dim != output_dim else None
-        )
-        self.layer_norm = nn.LayerNorm(output_dim)
-
-    def forward(self, x, context=None):
-        out = self.linear1(x)
-        if context is not None:
-            out += self.context_linear(context)
-        out = self.elu(out)
-        out = self.linear2(out)
-        out = self.dropout(out)
-        gated = self.sigmoid(self.gate(out))
-        out = out * gated
-        skip = self.skip(x) if self.skip is not None else x
-        out = self.layer_norm(out + skip)
-        return out
-
-
-class VariableSelectionNetwork(nn.Module):
-    def __init__(
-        self, num_inputs, input_dim, hidden_dim, context_dim=None, dropout=0.1
-    ):
-        super().__init__()
-        self.num_inputs = num_inputs
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.context_dim = context_dim
-        self.variable_grns = nn.ModuleList(
-            [
-                GatedResidualNetwork(
-                    input_dim, hidden_dim, hidden_dim, context_dim, dropout
-                )
-                for _ in range(num_inputs)
+                nn.Sequential(nn.Linear(64, 128), nn.ReLU(), nn.Linear(128, 1))
+                for _ in range(0, num_output)
             ]
         )
-        self.softmax = nn.Softmax(dim=-1)
-        self.weight_grn = GatedResidualNetwork(
-            num_inputs * hidden_dim, hidden_dim, num_inputs, context_dim, dropout
-        )
 
-    def forward(self, x, context=None):
-        # x: (batch, num_inputs, input_dim)
-        var_outputs = []
-        for i, grn in enumerate(self.variable_grns):
-            var_out = grn(x[:, i, :], context)
-            var_outputs.append(var_out)
-        var_outputs = torch.stack(var_outputs, dim=1)  # (batch, num_inputs, hidden_dim)
-        flattened = var_outputs.view(var_outputs.size(0), -1)
-        weights = self.weight_grn(flattened, context)
-        weights = self.softmax(weights)  # (batch, num_inputs)
-        # Weighted sum of variable outputs
-        weighted_output = (var_outputs * weights.unsqueeze(-1)).sum(dim=1)
-        return weighted_output, weights  # (batch, hidden_dim), (batch, num_inputs)
+    def forward(self, x_tab, x_ts, x_seeder):
+        # x_tab: (batch, num_tabular_features)
+
+        ts_out = torch.concat(
+            [
+                self.ts_embedders[i](x_ts[Ellipsis, i].unsqueeze(-1))
+                for i in range(0, self.num_ts_features)
+            ],
+            axis=-1,
+        )  # (batch, timestep, embedding_size * num_ts_features)
+
+        ts_out, (hn, cn) = self.lstm(ts_out)  # (batch, timestep, embedding_size)
+
+        seeder_out = self.emb_seeder(x_seeder)  # (batch, num_output, embeding_size )
+
+        output = torch.concat([ts_out, seeder_out], axis=-2)
+        output, attn = self.imh_attn(output, output, output)
+
+        # Extract on the the last num_output features
+        output = output[:, -self.num_output :, :]
+
+        outs = []
+        for i in range(0, self.num_output):
+            out_tab = self.mlp_tab(x_tab)
+            out_ts = self.mlps_ts[i](output[:, i, :])
+            comb = torch.cat((out_tab, out_ts), dim=1)
+            out = self.regs[i](comb)
+            outs.append(out)
+
+        final = torch.concat(outs, dim=1)
+
+        return final, attn
 
 
 class ScaledDotProductAttention(nn.Module):
@@ -223,15 +205,15 @@ class InterpretableMultiHeadAttention(nn.Module):
         return outputs, attn
 
 
-embedding_size = 12
-d_model = embedding_size
-n_head = 4
-batch_size = 12
-number_features = 6
+# embedding_size = 12
+# d_model = embedding_size
+# n_head = 4
+# batch_size = 12
+# number_features = 6
 
-att_layer = InterpretableMultiHeadAttention(n_head=n_head, d_model=d_model, dropout=0.5)
-x = torch.randn(batch_size, number_features, embedding_size)
-print(x.shape)
-output, att = att_layer(x, x, x)
-print(output.shape)
-print(att.shape)
+# att_layer = InterpretableMultiHeadAttention(n_head=n_head, d_model=d_model, dropout=0.5)
+# x = torch.randn(batch_size, number_features, embedding_size)
+# print(x.shape)
+# output, att = att_layer(x, x, x)
+# print(output.shape)
+# print(att.shape)
