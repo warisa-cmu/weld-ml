@@ -272,7 +272,7 @@ class VariableSelectionNetwork(nn.Module):
         self.additional_context = additional_context
 
         self.flattened_grn = GatedResidualNetwork(
-            self.hidden_layer_size,
+            self.hidden_layer_size,  # NR: This seems wrong because the dimension for the flattened array should be a combination of sizes.
             input_size=self.input_size,
             output_size=self.output_size,
             dropout_rate=self.dropout_rate,
