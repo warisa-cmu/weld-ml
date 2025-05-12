@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 
 
-class MyModel(nn.Module):
+class MyModel_Attn(nn.Module):
     def __init__(
         self,
         num_tabular_features,
@@ -39,6 +39,8 @@ class MyModel(nn.Module):
 
         self.emb_seeder = nn.Embedding(self.num_output, self.ts_embedding_size)
 
+        self.norm = nn.LayerNorm(self.ts_embedding_size)
+
         self.imh_attn = InterpretableMultiHeadAttention(
             n_head=self.attn_n_head,
             d_model=self.ts_embedding_size,
@@ -68,7 +70,9 @@ class MyModel(nn.Module):
 
         self.regs = nn.ModuleList(
             [
-                nn.Sequential(nn.Linear(64, 128), nn.ReLU(), nn.Linear(128, 1))
+                nn.Sequential(
+                    nn.LayerNorm(64), nn.Linear(64, 128), nn.ReLU(), nn.Linear(128, 1)
+                )
                 for _ in range(0, num_output)
             ]
         )
@@ -89,6 +93,10 @@ class MyModel(nn.Module):
         seeder_out = self.emb_seeder(x_seeder)  # (batch, num_output, embeding_size )
 
         output = torch.concat([ts_out, seeder_out], axis=-2)
+
+        # Layernorm
+        output = self.norm(output)
+
         output, attn = self.imh_attn(output, output, output)
 
         # Extract on the the last num_output features
@@ -103,6 +111,18 @@ class MyModel(nn.Module):
             outs.append(out)
 
         final = torch.concat(outs, dim=1)
+
+        # Test with just single MLP
+        # comb_size = self.ts_embedding_size * self.num_output
+        # flatten = output.view(-1, comb_size)
+        # outs = nn.Sequential(
+        #     nn.Linear(comb_size, 64),
+        #     nn.ReLU(),
+        #     nn.Linear(64, 32),
+        #     nn.ReLU(),
+        #     nn.Linear(32, self.num_output),
+        # )(flatten)
+        # final = outs
 
         return final, attn
 
