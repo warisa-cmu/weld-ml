@@ -29,7 +29,15 @@ class MyModel_Attn(nn.Module):
             [nn.Linear(1, self.ts_embedding_size) for _ in range(self.num_ts_features)]
         )
 
-        self.lstm = nn.LSTM(
+        self.lstm1 = nn.LSTM(
+            input_size=self.ts_embedding_size * self.num_ts_features,
+            hidden_size=self.ts_embedding_size,  # This will be the output size
+            num_layers=self.lstm_num_layers,
+            batch_first=True,
+            dropout=self.lstm_dropout,
+        )
+
+        self.lstm2 = nn.LSTM(
             input_size=self.ts_embedding_size * self.num_ts_features,
             hidden_size=self.ts_embedding_size,  # This will be the output size
             num_layers=self.lstm_num_layers,
@@ -88,9 +96,9 @@ class MyModel_Attn(nn.Module):
             axis=-1,
         )  # (batch, timestep, embedding_size * num_ts_features)
 
-        ts_out, (hn, cn) = self.lstm(ts_out)  # (batch, timestep, embedding_size)
-
+        ts_out, (hn, cn) = self.lstm1(ts_out)  # (batch, timestep, embedding_size)
         seeder_out = self.emb_seeder(x_seeder)  # (batch, num_output, embeding_size )
+        seeder_out, (hn, cn) = self.lstm2(seeder_out)
 
         output = torch.concat([ts_out, seeder_out], axis=-2)
 
