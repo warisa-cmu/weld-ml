@@ -3,56 +3,80 @@ import torch
 import torch.nn.functional as F
 
 
+class NumericalEmbedder(nn.Module):
+    def __init__(self, embedding_size: int, num_features: int):
+        super().__init__()
+        self.embedding_size = embedding_size
+        self.num_features = num_features
+        self.embedders = nn.ModuleList(
+            [nn.Linear(1, embedding_size) for _ in range(num_features)]
+        )
+
+    def forward(self, X: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            X: Tensor of shape (batch, timestep, num_features)
+
+        Returns:
+            Tensor of shape (batch, timestep, embedding_size * num_features)
+        """
+        # Embed each feature separately and concatenate along the last axis
+        embeddings = [
+            self.embedders[i](X[..., i].unsqueeze(-1)) for i in range(self.num_features)
+        ]
+        # embeddings is a list of (batch, timestep, embedding_size)
+        out = torch.cat(
+            embeddings, dim=-1
+        )  # (batch, timestep, embedding_size * num_features)
+        return out
+
+
 class MyModel_Attn(nn.Module):
     def __init__(
         self,
-        num_tabular_features,
-        ts_embedding_size,
-        num_ts_features,
-        lstm_num_layers,
-        lstm_dropout,
-        attn_n_head,
+        tab_num_features,
         num_output,
+        ts_num_features,
+        ts_embedding_size=4,
+        lstm_num_layers=2,
+        lstm_dropout=0.5,
+        attn_n_head=2,
     ):
         super().__init__()
 
-        self.num_tabular_features = num_tabular_features
-        self.num_ts_features = num_ts_features
-        self.lstm_num_layers = lstm_num_layers
-        self.lstm_dropout = lstm_dropout
-        self.attn_n_head = attn_n_head
         self.num_output = num_output
 
         # Embeddeding layer (time series)
-        self.ts_embedding_size = ts_embedding_size
-        self.ts_embedders = nn.ModuleList(
-            [nn.Linear(1, self.ts_embedding_size) for _ in range(self.num_ts_features)]
+        self.ts_embedder = NumericalEmbedder(
+            embedding_size=ts_embedding_size, num_features=ts_num_features
         )
 
-        self.lstm1 = nn.LSTM(
-            input_size=self.ts_embedding_size * self.num_ts_features,
-            hidden_size=self.ts_embedding_size,  # This will be the output size
-            num_layers=self.lstm_num_layers,
+        self.lstm_encoder = nn.LSTM(
+            input_size=ts_embedding_size * ts_num_features,
+            hidden_size=ts_embedding_size,  # This will be the output size
+            num_layers=lstm_num_layers,
             batch_first=True,
-            dropout=self.lstm_dropout,
+            dropout=lstm_dropout,
         )
 
-        self.lstm2 = nn.LSTM(
-            input_size=self.ts_embedding_size * self.num_ts_features,
-            hidden_size=self.ts_embedding_size,  # This will be the output size
-            num_layers=self.lstm_num_layers,
+        self.lstm_decoder = nn.LSTM(
+            input_size=ts_embedding_size * 1,
+            hidden_size=ts_embedding_size,  # This will be the output size
+            num_layers=lstm_num_layers,
             batch_first=True,
-            dropout=self.lstm_dropout,
+            dropout=lstm_dropout,
         )
 
-        self.emb_seeder = nn.Embedding(self.num_output, self.ts_embedding_size)
+        self.future_embedder = NumericalEmbedder(
+            num_features=1, embedding_size=ts_embedding_size
+        )
 
-        self.norm = nn.LayerNorm(self.ts_embedding_size)
+        self.norm = nn.LayerNorm(ts_embedding_size)
 
         self.imh_attn = InterpretableMultiHeadAttention(
-            n_head=self.attn_n_head,
-            d_model=self.ts_embedding_size,
-            dropout=self.lstm_dropout,
+            n_head=attn_n_head,
+            d_model=ts_embedding_size,
+            dropout=lstm_dropout,
         )
 
         # MLP to process each output
@@ -70,7 +94,7 @@ class MyModel_Attn(nn.Module):
 
         # MLP for tabular data
         self.mlp_tab = nn.Sequential(
-            nn.Linear(num_tabular_features, 64),
+            nn.Linear(tab_num_features, 64),
             nn.ReLU(),
             nn.Linear(64, 32),
             nn.ReLU(),
@@ -85,24 +109,24 @@ class MyModel_Attn(nn.Module):
             ]
         )
 
-    def forward(self, x_tab, x_ts, x_seeder):
+    def forward(self, x_tab, x_ts, x_future):
         # x_tab: (batch, num_tabular_features)
 
-        ts_out = torch.concat(
-            [
-                self.ts_embedders[i](x_ts[Ellipsis, i].unsqueeze(-1))
-                for i in range(0, self.num_ts_features)
-            ],
-            axis=-1,
-        )  # (batch, timestep, embedding_size * num_ts_features)
+        # (batch, timestep, embedding_size * num_ts_features)
+        past_out = self.ts_embedder(x_ts)
 
-        ts_out, (hn, cn) = self.lstm1(ts_out)  # (batch, timestep, embedding_size)
-        seeder_out = self.emb_seeder(x_seeder)  # (batch, num_output, embeding_size )
-        seeder_out, (hn, cn) = self.lstm2(seeder_out)
+        # (batch, timestep, embedding_size)
+        past_out, (hn, cn) = self.lstm_encoder(past_out)
 
-        output = torch.concat([ts_out, seeder_out], axis=-2)
+        # (batch, num_output, embedding_size * num_ts_features)
+        future_out = self.future_embedder(x_future)
 
-        # Layernorm
+        # (batch, timestep, embedding_size)
+        future_out, (hn, cn) = self.lstm_decoder(future_out)
+
+        output = torch.concat([past_out, future_out], axis=-2)
+
+        # Layer Norm
         output = self.norm(output)
 
         output, attn = self.imh_attn(output, output, output)
@@ -110,15 +134,17 @@ class MyModel_Attn(nn.Module):
         # Extract on the the last num_output features
         output = output[:, -self.num_output :, :]
 
-        outs = []
-        for i in range(0, self.num_output):
-            out_tab = self.mlp_tab(x_tab)
-            out_ts = self.mlps_ts[i](output[:, i, :])
-            comb = torch.cat((out_tab, out_ts), dim=1)
-            out = self.regs[i](comb)
-            outs.append(out)
+        return output
 
-        final = torch.concat(outs, dim=1)
+        # outs = []
+        # for i in range(0, self.num_output):
+        #     out_tab = self.mlp_tab(x_tab)
+        #     out_ts = self.mlps_ts[i](output[:, i, :])
+        #     comb = torch.cat((out_tab, out_ts), dim=1)
+        #     out = self.regs[i](comb)
+        #     outs.append(out)
+
+        # final = torch.concat(outs, dim=1)
 
         # Test with just single MLP
         # comb_size = self.ts_embedding_size * self.num_output
@@ -132,7 +158,7 @@ class MyModel_Attn(nn.Module):
         # )(flatten)
         # final = outs
 
-        return final, attn
+        # return final, attn
 
 
 class ScaledDotProductAttention(nn.Module):
@@ -233,14 +259,39 @@ class InterpretableMultiHeadAttention(nn.Module):
         return outputs, attn
 
 
-# embedding_size = 12
-# d_model = embedding_size
-# n_head = 4
-# batch_size = 12
-# number_features = 6
+ts_embedding_size = 8
+ts_num_features = 3
+tab_num_features = 4
+d_model = ts_embedding_size
+n_head = 4
+batch_size = 2
+timesteps = 50
+num_output = 3
+
+model = MyModel_Attn(
+    tab_num_features=tab_num_features,
+    num_output=num_output,
+    ts_num_features=ts_num_features,
+    ts_embedding_size=ts_embedding_size,
+)
+
+x_tab = torch.randn(batch_size, tab_num_features)
+x_ts = torch.randn(batch_size, timesteps, ts_num_features)
+x_future = torch.randn(batch_size, num_output, 1)
+model(x_tab=x_tab, x_future=x_future, x_ts=x_ts)
+
+# embedder = NumericalEmbedder(
+#     num_features=ts_num_features, embedding_size=ts_embedding_size
+# )
+# x = torch.randn(batch_size, timesteps, ts_num_features)
+# y = embedder(x)
+# print(x.shape)
+# print(y.shape)
+# print(x)
+# print(y)
 
 # att_layer = InterpretableMultiHeadAttention(n_head=n_head, d_model=d_model, dropout=0.5)
-# x = torch.randn(batch_size, number_features, embedding_size)
+# x = torch.randn(batch_size, ts_num_features, ts_embedding_size)
 # print(x.shape)
 # output, att = att_layer(x, x, x)
 # print(output.shape)
