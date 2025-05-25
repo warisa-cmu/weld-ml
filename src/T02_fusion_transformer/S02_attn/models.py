@@ -134,7 +134,7 @@ class MyModel_Attn(nn.Module):
         # Extract on the the last num_output features
         output = output[:, -self.num_output :, :]
 
-        flatten_size = batch_size * self.ts_embedding_size
+        flatten_size = self.num_output * self.ts_embedding_size
         output = output.view(
             (batch_size, flatten_size)
         )  # (batch_size, num_output * embedding_size)
@@ -247,7 +247,7 @@ ts_num_features = 3
 tab_num_features = 4
 d_model = ts_embedding_size
 n_head = 4
-batch_size = 3
+batch_size = 6
 timesteps = 50
 num_output = 3
 
