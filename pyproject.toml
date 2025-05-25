@@ -22,7 +22,9 @@ dependencies = [
     "seaborn>=0.13.2",
     "tensorboard>=2.19.0",
     "torch>=2.6.0",
+    "torchinfo>=1.8.0",
     "torchvision>=0.21.0",
+    "torchviz>=0.0.3",
     "tqdm>=4.67.1",
     "tsfresh>=0.21.0",
 ]
