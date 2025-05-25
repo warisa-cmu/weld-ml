@@ -45,6 +45,8 @@ class MyModel_Attn(nn.Module):
         super().__init__()
 
         self.num_output = num_output
+        self.ts_embedding_size = ts_embedding_size
+        self.lstm_num_layers = lstm_num_layers
 
         # Embeddeding layer (time series)
         self.ts_embedder = NumericalEmbedder(
@@ -79,50 +81,48 @@ class MyModel_Attn(nn.Module):
             dropout=lstm_dropout,
         )
 
-        # MLP to process each output
-        self.mlps_ts = nn.ModuleList(
-            [
-                nn.Sequential(
-                    nn.Linear(ts_embedding_size, 64),
-                    nn.ReLU(),
-                    nn.Linear(64, 32),
-                    nn.ReLU(),
-                )
-                for _ in range(0, num_output)
-            ]
+        self.tab_embedder = NumericalEmbedder(
+            num_features=tab_num_features, embedding_size=ts_embedding_size
         )
 
         # MLP for tabular data
         self.mlp_tab = nn.Sequential(
-            nn.Linear(tab_num_features, 64),
+            nn.Linear(tab_num_features * ts_embedding_size, 64),
             nn.ReLU(),
             nn.Linear(64, 32),
             nn.ReLU(),
+            nn.Linear(32, lstm_num_layers * ts_embedding_size),
         )
 
-        self.regs = nn.ModuleList(
-            [
-                nn.Sequential(
-                    nn.LayerNorm(64), nn.Linear(64, 128), nn.ReLU(), nn.Linear(128, 1)
-                )
-                for _ in range(0, num_output)
-            ]
+        comb_size = ts_embedding_size * num_output
+        self.mlp_last = nn.Sequential(
+            nn.Linear(comb_size, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, self.num_output),
         )
 
     def forward(self, x_tab, x_ts, x_future):
+        batch_size = x_tab.shape[0]
         # x_tab: (batch, num_tabular_features)
+
+        tab_out = self.tab_embedder(x_tab.unsqueeze(dim=1))
+        tab_out = self.tab_embedder(tab_out)
+        tab_out = self.mlp_tab(tab_out)
+        tab_out = tab_out.view(self.lstm_num_layers, batch_size, -1)
 
         # (batch, timestep, embedding_size * num_ts_features)
         past_out = self.ts_embedder(x_ts)
 
         # (batch, timestep, embedding_size)
-        past_out, (hn, cn) = self.lstm_encoder(past_out)
+        past_out, (hn, cn) = self.lstm_encoder(past_out, (tab_out, tab_out))
 
         # (batch, num_output, embedding_size * num_ts_features)
         future_out = self.future_embedder(x_future)
 
         # (batch, timestep, embedding_size)
-        future_out, (hn, cn) = self.lstm_decoder(future_out)
+        future_out, (hn, cn) = self.lstm_decoder(future_out, (hn, cn))
 
         output = torch.concat([past_out, future_out], axis=-2)
 
@@ -134,31 +134,14 @@ class MyModel_Attn(nn.Module):
         # Extract on the the last num_output features
         output = output[:, -self.num_output :, :]
 
-        return output
+        flatten_size = batch_size * self.ts_embedding_size
+        output = output.view(
+            (batch_size, flatten_size)
+        )  # (batch_size, num_output * embedding_size)
 
-        # outs = []
-        # for i in range(0, self.num_output):
-        #     out_tab = self.mlp_tab(x_tab)
-        #     out_ts = self.mlps_ts[i](output[:, i, :])
-        #     comb = torch.cat((out_tab, out_ts), dim=1)
-        #     out = self.regs[i](comb)
-        #     outs.append(out)
-
-        # final = torch.concat(outs, dim=1)
-
-        # Test with just single MLP
-        # comb_size = self.ts_embedding_size * self.num_output
-        # flatten = output.view(-1, comb_size)
-        # outs = nn.Sequential(
-        #     nn.Linear(comb_size, 64),
-        #     nn.ReLU(),
-        #     nn.Linear(64, 32),
-        #     nn.ReLU(),
-        #     nn.Linear(32, self.num_output),
-        # )(flatten)
-        # final = outs
-
-        # return final, attn
+        flatten = output.view(batch_size, -1)
+        final = self.mlp_last(flatten)
+        return final, attn
 
 
 class ScaledDotProductAttention(nn.Module):
@@ -264,7 +247,7 @@ ts_num_features = 3
 tab_num_features = 4
 d_model = ts_embedding_size
 n_head = 4
-batch_size = 2
+batch_size = 3
 timesteps = 50
 num_output = 3
 
@@ -278,7 +261,10 @@ model = MyModel_Attn(
 x_tab = torch.randn(batch_size, tab_num_features)
 x_ts = torch.randn(batch_size, timesteps, ts_num_features)
 x_future = torch.randn(batch_size, num_output, 1)
-model(x_tab=x_tab, x_future=x_future, x_ts=x_ts)
+(y, att) = model(x_tab=x_tab, x_future=x_future, x_ts=x_ts)
+print(y.shape)
+print(att.shape)
+
 
 # embedder = NumericalEmbedder(
 #     num_features=ts_num_features, embedding_size=ts_embedding_size
