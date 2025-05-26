@@ -94,7 +94,7 @@ class MyModel_Attn(nn.Module):
             nn.Linear(32, lstm_num_layers * ts_embedding_size),
         )
 
-        comb_size = ts_embedding_size * num_output
+        comb_size = ts_embedding_size * num_output + lstm_num_layers * ts_embedding_size
         self.mlp_last = nn.Sequential(
             nn.Linear(comb_size, 64),
             nn.ReLU(),
@@ -110,13 +110,20 @@ class MyModel_Attn(nn.Module):
         tab_out = self.tab_embedder(x_tab.unsqueeze(dim=1))
         tab_out = self.tab_embedder(tab_out)
         tab_out = self.mlp_tab(tab_out)
-        tab_out = tab_out.view(self.lstm_num_layers, batch_size, -1)
+
+        # For skip connenction
+        tab_out_flatten = tab_out.view(
+            batch_size, -1
+        )  # (batch_size, lstm_num_layers * ts_embedding_size)
+
+        # For feeding into lstm
+        hc = tab_out.view(self.lstm_num_layers, batch_size, -1)
 
         # (batch, timestep, embedding_size * num_ts_features)
         past_out = self.ts_embedder(x_ts)
 
         # (batch, timestep, embedding_size)
-        past_out, (hn, cn) = self.lstm_encoder(past_out, (tab_out, tab_out))
+        past_out, (hn, cn) = self.lstm_encoder(past_out, (hc, hc))
 
         # (batch, num_output, embedding_size * num_ts_features)
         future_out = self.future_embedder(x_future)
@@ -138,8 +145,9 @@ class MyModel_Attn(nn.Module):
         output = output.view(
             (batch_size, flatten_size)
         )  # (batch_size, num_output * embedding_size)
+        flatten_ts = output.view(batch_size, -1)
 
-        flatten = output.view(batch_size, -1)
+        flatten = torch.concat([flatten_ts, tab_out_flatten], dim=1)
         final = self.mlp_last(flatten)
         return final, attn
 
