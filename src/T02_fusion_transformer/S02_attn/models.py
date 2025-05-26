@@ -89,17 +89,21 @@ class MyModel_Attn(nn.Module):
         self.mlp_tab = nn.Sequential(
             nn.Linear(tab_num_features * ts_embedding_size, 64),
             nn.ReLU(),
+            nn.Dropout(0.5),
             nn.Linear(64, 32),
             nn.ReLU(),
+            nn.Dropout(0.5),
             nn.Linear(32, lstm_num_layers * ts_embedding_size),
         )
 
         comb_size = ts_embedding_size * num_output + lstm_num_layers * ts_embedding_size
         self.mlp_last = nn.Sequential(
-            nn.Linear(comb_size, 64),
+            nn.Linear(comb_size, 128),
             nn.ReLU(),
-            nn.Linear(64, 32),
+            nn.Dropout(0.5),
+            nn.Linear(128, 32),
             nn.ReLU(),
+            nn.Dropout(0.5),
             nn.Linear(32, self.num_output),
         )
 
