@@ -79,10 +79,6 @@ class MyEval:
         r2 = r2_score(y_true=y_true, y_pred=y_pred)
         return mse, mape, r2
 
-    @staticmethod
-    def pp():
-        print("no")
-
     @classmethod
     def eval(cls, Y_train, Y_test, Y_train_pred, Y_test_pred, **kwargs):
         data_arr = []
@@ -131,9 +127,10 @@ class MyEval:
         Y_test,
         Y_train_pred,
         Y_test_pred,
+        current_dir=".",
         dt="",
         save=False,
-        show=True,
+        show=False,
         file_prefix="",
     ):
         for i in range(0, Y_train.shape[1]):
@@ -165,8 +162,10 @@ class MyEval:
                 if file_prefix == "":
                     raise Exception("Please specify file prefix")
 
-                filename = f"{file_prefix}_{dt}_{i}.png"
+                filename = f"{current_dir}/{file_prefix}_{dt}_{i}.png"
                 fig.savefig(filename, dpi=300)
 
             if show:
                 plt.show()
+            else:
+                plt.close(fig)

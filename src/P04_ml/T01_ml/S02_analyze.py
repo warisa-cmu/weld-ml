@@ -78,9 +78,10 @@ for idx, fit in df_fit_select.iterrows():
             Y_train_pred=Y_train_pred,
             Y_test=Y_test,
             Y_test_pred=Y_test_pred,
+            current_dir=CURRENT_DIR,
             dt=dt,
             save=SAVE_PLOT_RES,
-            file_prefix=f"S05-{estimator}-{id_split}",
+            file_prefix=f"S02-{estimator}-{id_split}",
         )
 
 df_eval = pd.concat(df_arr).reset_index(drop=True)
