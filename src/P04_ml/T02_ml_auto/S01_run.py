@@ -55,9 +55,9 @@ base_gbr = MultiOutputRegressor(estimator=GradientBoostingRegressor())
 
 param_grid_hyper = [
     {"base": [base_lr]},
-    {"base": [base_svr], "base__estimator__C": [0.01, 0.1, 1]},
-    {"base": [base_rf], "base__estimator__n_estimators": [10, 50, 200]},
-    {"base": [base_gbr], "base__estimator__max_depth": [1, 2, 3, 4, 5]},
+    {"base": [base_svr], "base__estimator__C": [1, 100]},
+    {"base": [base_rf], "base__estimator__n_estimators": [100]},
+    {"base": [base_gbr], "base__estimator__n_estimators": [100]},
 ]
 
 # Initialize blank model (optional)

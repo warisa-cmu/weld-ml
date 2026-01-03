@@ -1,4 +1,3 @@
-import re
 from pathlib import Path
 from pprint import pp
 
@@ -6,14 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import GridSearchCV, ParameterGrid
-from sklearn.multioutput import MultiOutputRegressor
-from sklearn.preprocessing import StandardScaler
-from sklearn.svm import SVR
 
-from P04_ml.T00_lib.classes import DataHandler, MyEval, MyUtil, RegSwitcher
+from P04_ml.T00_lib.classes import MyEval, MyUtil, RegSwitcher
 from P04_ml.T00_lib.utils import check_jupyter
 
 if check_jupyter():
@@ -23,14 +16,14 @@ else:
     BASE_DIR = Path.cwd()  # Base directory of the project
     CURRENT_DIR = Path(__file__).resolve().parent
 
-filenameInput = CURRENT_DIR / "S01_2026-01-03_08-14.pkl"
+filenameInput = CURRENT_DIR / "S01_2026-01-03_10-42.pkl"
 
 # Residual plots
-IS_PLOT_RES = True
-SAVE_PLOT_RES = True
+IS_PLOT_RES = False
+SAVE_PLOT_RES = False
 
 SAVE_PLOT = True
-SAVE_DATA = True
+SAVE_DATA = False
 
 dt = MyUtil.get_dt()
 data_load = MyUtil.load_data(filename=filenameInput)
