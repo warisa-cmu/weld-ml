@@ -11,25 +11,26 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
 
-from P04_ml.T00_lib.classes import DataHandler, MyUtil, RegSwitcher
-from P04_ml.T00_lib.utils import check_jupyter
+from P03_run_diff_sigma.T00_lib.classes import DataHandler, MyUtil, RegSwitcher
+from P03_run_diff_sigma.T00_lib.utils import check_jupyter
 
 if check_jupyter():
     BASE_DIR = Path.cwd()  # Current directory of the running file
-    DATA_DIR = BASE_DIR.parent.parent / "P03_data_preprocess"
+    DATA_DIR = BASE_DIR.parent / "T02_combine_features"
     CURRENT_DIR = BASE_DIR
 else:
     BASE_DIR = Path.cwd()  # Base directory of the project
-    DATA_DIR = BASE_DIR / "src/P03_data_preprocess"
+    DATA_DIR = BASE_DIR / "src/P3_run_diff_sigma/T02_combine_features"
     CURRENT_DIR = Path(__file__).resolve().parent
 
-SAVE_DATA = True
 dt = MyUtil.get_dt()
 print(f"Current Directory: {CURRENT_DIR}")
 print(f"Current Date and Time: {dt}")
 
+SAVE_DATA = True
+
 # Load data
-df = pd.read_excel(DATA_DIR / "S07_data_combined_loc.xlsx")
+df = pd.read_excel(DATA_DIR / "S02_data_combined_loc.xlsx")
 print(df.shape)
 
 # %%
