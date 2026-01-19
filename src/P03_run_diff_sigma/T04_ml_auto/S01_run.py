@@ -20,7 +20,7 @@ if check_jupyter():
     CURRENT_DIR = BASE_DIR
 else:
     BASE_DIR = Path.cwd()  # Base directory of the project
-    DATA_DIR = BASE_DIR / "src/P3_run_diff_sigma/T02_combine_features"
+    DATA_DIR = BASE_DIR / "src/P03_run_diff_sigma/T02_combine_features"
     CURRENT_DIR = Path(__file__).resolve().parent
 
 dt = MyUtil.get_dt()
