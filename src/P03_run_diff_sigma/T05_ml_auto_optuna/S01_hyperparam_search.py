@@ -11,10 +11,10 @@ from pprint import pp
 import numpy as np
 import optuna
 import pandas as pd
-from sklearn.model_selection import ParameterGrid, cross_val_score
+from sklearn.model_selection import ParameterGrid, cross_val_score, cross_validate
 from sklearn.preprocessing import StandardScaler
 
-from P03_run_diff_sigma.T00_lib.classes import DataHandler, MyUtil, OptunaUtil
+from P03_run_diff_sigma.T00_lib.classes import DataHandler, MyUtil, OptunaUtil, MyEval
 from P03_run_diff_sigma.T00_lib.utils import check_jupyter
 
 # %% Initialize paths and settings
@@ -66,7 +66,7 @@ def _objective(
     Y_train: np.ndarray,
     model: str,
     cv=3,
-    scoring="neg_mean_squared_error",
+    objective_score="mse_mean",
 ):
     if model == "RandomForest":
         n_estimators = trial.suggest_int("n_estimators", 1, 1000, log=True)
@@ -82,13 +82,35 @@ def _objective(
         raise ValueError(f"Model {model} not recognized in objective function")
 
     # Perform cross-validation
-    scores = cross_val_score(reg, X_train, Y_train, cv=cv, scoring=scoring)
-    if scoring == "neg_mean_squared_error":
-        # For MSE, higher negative value is better, so we take negative of mean
-        mse = -scores.mean()
-        return mse
+
+    scoring = ["neg_mean_squared_error", "neg_mean_absolute_percentage_error", "r2"]
+
+    cv_results = cross_validate(
+        reg,
+        X_train,
+        Y_train,
+        cv=cv,
+        scoring=scoring,
+        return_train_score=False,
+    )
+
+    scores = dict(
+        mse_mean=-cv_results["test_neg_mean_squared_error"].mean(),
+        mse_std=cv_results["test_neg_mean_squared_error"].std(),
+        mape_mean=-cv_results["test_neg_mean_absolute_percentage_error"].mean(),
+        mape_std=cv_results["test_neg_mean_absolute_percentage_error"].std(),
+        r2_mean=cv_results["test_r2"].mean(),
+        r2_std=cv_results["test_r2"].std(),
+    )
+
+    # Store all scores as user attributes
+    trial.set_user_attr(key="scores", value=scores)
+
+    # Return the objective score
+    if objective_score == "mse_mean":
+        return scores["mse_mean"]
     else:
-        raise ValueError(f"Unsupported scoring method: {scoring}")
+        raise ValueError(f"Unsupported objective_score: {objective_score}")
 
 
 # %% Prepare optuna study
@@ -145,12 +167,16 @@ for idx_study, param_study in enumerate(param_study_list[:]):
     # Save sampler state for reproducibility
     optuna_util.save_sampler(sampler)
 
+    # Collect study results
+    best_trial = study.best_trial
+    best_trial_scores = best_trial.user_attrs["scores"]
     _study_info = dict(
         **param_study,
         study_name=optuna_util.study_name,
         best_param=study.best_params,
         best_value=study.best_value,
         total_trial=study.trials_dataframe().shape[0],
+        **best_trial_scores,
     )
     study_info_arr.append(_study_info)
 
