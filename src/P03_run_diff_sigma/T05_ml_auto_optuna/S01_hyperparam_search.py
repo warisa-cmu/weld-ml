@@ -49,10 +49,10 @@ data_handler = DataHandler(
 # Create parameter grid
 param_study_grid = [
     {
-        "random_state": [1, 2, 3, 4, 5],
+        "random_state": [1],
         "test_size": [0.3],
-        "model": ["RandomForest", "SVR"],
-        "n_trials": [1],
+        "model": ["RandomForest"],
+        "n_trials": [50],
     },
 ]
 param_study_list = list(ParameterGrid(param_study_grid))
@@ -69,15 +69,54 @@ def _objective(
     objective_score="mse_mean",
 ):
     if model == "RandomForest":
-        n_estimators = trial.suggest_int("n_estimators", 1, 1000, log=True)
-        max_depth = trial.suggest_int("max_depth", 1, 32, log=True)
+        n_estimators = trial.suggest_int("n_estimators", 50, 500, log=True)
+        max_depth = trial.suggest_int("max_depth", 3, 128, log=True)
+        min_samples_split = trial.suggest_int("min_samples_split", 2, 50)
+        min_samples_leaf = trial.suggest_int("min_samples_leaf", 1, 50)
+        max_features = trial.suggest_categorical(
+            "max_features", ["sqrt", "log2", 0.2, 0.5, 0.8, 1.0]
+        )
+        bootstrap = trial.suggest_categorical("bootstrap", [True, False])
+        criterion = trial.suggest_categorical(
+            "criterion", ["squared_error", "absolute_error"]
+        )
         reg = OptunaUtil.get_model(
-            model_name=model, n_estimators=n_estimators, max_depth=max_depth
+            model_name=model,
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+            min_samples_split=min_samples_split,
+            min_samples_leaf=min_samples_leaf,
+            max_features=max_features,
+            bootstrap=bootstrap,
+            criterion=criterion,
         )
     elif model == "SVR":
-        C = trial.suggest_float("C", 1e-6, 1e2, log=True)
-        gamma = trial.suggest_float("gamma", 1e-6, 1e1, log=True)
-        reg = OptunaUtil.get_model(model_name=model, C=C, gamma=gamma)
+        kernel = trial.suggest_categorical(
+            "kernel", ["rbf", "linear", "poly", "sigmoid"]
+        )
+        C = trial.suggest_float("C", 1e-6, 1e6, log=True)
+        epsilon = trial.suggest_float("epsilon", 1e-6, 1.0, log=True)
+        # gamma: allow 'scale'/'auto' or numeric
+        gamma_choice = trial.suggest_categorical(
+            "gamma_choice", ["scale", "auto", "float"]
+        )
+        if gamma_choice == "float":
+            gamma = trial.suggest_float("gamma", 1e-6, 1e1, log=True)
+        else:
+            gamma = gamma_choice
+        coef0 = trial.suggest_float("coef0", -1.0, 1.0)
+        degree = trial.suggest_int("degree", 2, 5) if kernel == "poly" else 3
+        shrinking = trial.suggest_categorical("shrinking", [True, False])
+        reg = OptunaUtil.get_model(
+            model_name=model,
+            kernel=kernel,
+            C=C,
+            gamma=gamma,
+            epsilon=epsilon,
+            coef0=coef0,
+            degree=degree,
+            shrinking=shrinking,
+        )
     else:
         raise ValueError(f"Model {model} not recognized in objective function")
 
@@ -149,7 +188,7 @@ for idx_study, param_study in enumerate(param_study_list[:]):
 
     # Load or create the sampler
     if not os.path.exists(optuna_util.sampler_filename):
-        sampler = optuna.samplers.CmaEsSampler(seed=42)
+        sampler = optuna.samplers.TPESampler(seed=42)
     else:
         sampler = optuna_util.load_sampler()
 

@@ -85,7 +85,7 @@ class OptunaUtil:
         elif model_name == "GradientBoosting":
             base_model = GradientBoostingRegressor(**params)
         elif model_name == "SVR":
-            base_model = SVR()
+            base_model = SVR(**params)
         elif model_name == "LinearRegression":
             base_model = LinearRegression(**params)
         else:
