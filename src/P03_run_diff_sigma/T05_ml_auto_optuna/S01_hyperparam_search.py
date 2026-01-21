@@ -77,7 +77,9 @@ optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout)
 
 # %% Run optimization
 model = "RandomForest"
-n_trials = 10
+n_trials = 1
+study_info_arr = []
+
 for idx_split, param_split in enumerate(param_list_split[:]):
     random_state = param_split["random_state"]
     test_size = param_split["test_size"]
@@ -116,3 +118,15 @@ for idx_split, param_split in enumerate(param_list_split[:]):
     # Save sampler state for reproducibility
     with open(f"{CURRENT_DIR}/{sampler_name}.pickle", "wb") as fout:
         pickle.dump(sampler, fout)
+
+    _study_info = dict(
+        model=model,
+        **param_split,
+        study_name=study_name,
+        best_param=study.best_params,
+        best_value=study.best_value,
+    )
+    study_info_arr.append(_study_info)
+
+study_info = pd.DataFrame.from_dict(study_info_arr)
+study_info.to_excel(CURRENT_DIR / "S01_hyperparam_search.xlsx", index=False)
