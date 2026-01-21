@@ -32,6 +32,8 @@ class OptunaUtil:
     sampler_filename = ""
     storage_path = ""
     db_name = "storage"
+    storage_dirname = "S01"
+    storage_dirpath = ""
 
     def __post_init__(self):
         names = self.get_names(
@@ -41,9 +43,20 @@ class OptunaUtil:
         )
         self.base_name = names["base_name"]
         self.sampler_name = names["sampler_name"]
-        self.sampler_filename = f"{self.current_dir}/{self.sampler_name}.pickle"
         self.study_name = names["study_name"]
-        self.storage_path = f"sqlite:///{self.current_dir}/{self.db_name}.db"
+        self.storage_dirpath = f"{self.current_dir}/{self.storage_dirname}"
+
+        if not os.path.exists(self.storage_dirpath):
+            os.makedirs(self.storage_dirpath)
+
+        self.storage_path = (
+            f"sqlite:///{self.current_dir}/{self.storage_dirname}/{self.db_name}.db"
+        )
+        self.sampler_filename = (
+            f"{self.current_dir}/{self.storage_dirname}/{self.sampler_name}.pickle"
+        )
+
+        print(f"Database path: {self.storage_path}")
 
     @staticmethod
     def get_names(model: str, random_state: int, test_size: float) -> str:

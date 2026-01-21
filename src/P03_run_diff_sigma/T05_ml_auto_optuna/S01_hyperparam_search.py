@@ -52,6 +52,7 @@ param_study_grid = [
         "random_state": [1, 2, 3, 4, 5],
         "test_size": [0.3],
         "model": ["RandomForest", "SVR"],
+        "n_trials": [1],
     },
 ]
 param_study_list = list(ParameterGrid(param_study_grid))
@@ -95,13 +96,16 @@ def _objective(
 optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout))
 
 # %% Run optimization
-n_trials = 2
 study_info_arr = []
 
 for idx_study, param_study in enumerate(param_study_list[:]):
-    model = param_study.get("model", "RandomForest")
-    random_state = param_study.get("random_state")
-    test_size = param_study.get("test_size")
+    # Extract parameters for the study
+    model = param_study["model"]
+    random_state = param_study["random_state"]
+    test_size = param_study["test_size"]
+    n_trials = param_study["n_trials"]
+
+    # Create OptunaUtil instance
     optuna_util = OptunaUtil(
         model=model,
         random_state=random_state,
@@ -109,13 +113,16 @@ for idx_study, param_study in enumerate(param_study_list[:]):
         current_dir=CURRENT_DIR,
     )
 
-    print(
-        f"Running study {idx_study}: model={model}, random_state={random_state}, test_size={test_size}"
+    # Print study information
+    pp(
+        f"Running study {idx_study}: model={model}, random_state={random_state}, test_size={test_size}, n_trials={n_trials}"
     )
 
+    # Prepare data
     data_handler.split_and_scale(random_state=random_state, test_size=test_size)
     X_train, Y_train = data_handler.get_train()
 
+    # Define objective function with fixed data
     objective = partial(_objective, X_train=X_train, Y_train=Y_train, model=model)
 
     # Load or create the sampler
@@ -139,15 +146,13 @@ for idx_study, param_study in enumerate(param_study_list[:]):
     optuna_util.save_sampler(sampler)
 
     _study_info = dict(
-        model=model,
         **param_study,
         study_name=optuna_util.study_name,
         best_param=study.best_params,
         best_value=study.best_value,
+        total_trial=study.trials_dataframe().shape[0],
     )
     study_info_arr.append(_study_info)
 
 study_info = pd.DataFrame.from_dict(study_info_arr)
 study_info.to_excel(CURRENT_DIR / "S01_hyperparam_search.xlsx", index=False)
-
-# %%
