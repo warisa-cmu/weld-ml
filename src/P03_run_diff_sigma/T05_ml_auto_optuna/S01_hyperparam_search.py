@@ -3,22 +3,18 @@
 # %%
 import logging
 import os
-import pickle
 import sys
 from functools import partial
 from pathlib import Path
 from pprint import pp
 
+import numpy as np
 import optuna
 import pandas as pd
-from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import GridSearchCV, ParameterGrid, cross_val_score
-from sklearn.multioutput import MultiOutputRegressor
+from sklearn.model_selection import ParameterGrid, cross_val_score
 from sklearn.preprocessing import StandardScaler
-from sklearn.svm import SVR
 
-from P03_run_diff_sigma.T00_lib.classes import DataHandler, MyUtil
+from P03_run_diff_sigma.T00_lib.classes import DataHandler, MyUtil, OptunaUtil
 from P03_run_diff_sigma.T00_lib.utils import check_jupyter
 
 # %% Initialize paths and settings
@@ -51,24 +47,47 @@ data_handler = DataHandler(
 )
 
 # Create parameter grid
-param_grid_split = [{"random_state": [1, 2, 3, 4, 5], "test_size": [0.3]}]
-param_list_split = list(ParameterGrid(param_grid_split))
-pp(param_list_split)
+param_study_grid = [
+    {
+        "random_state": [1, 2, 3, 4, 5],
+        "test_size": [0.3],
+        "model": ["RandomForest", "SVR"],
+    },
+]
+param_study_list = list(ParameterGrid(param_study_grid))
+pp(param_study_list)
 
 
 # %% Define Optuna objective function
-def _objective(trial, X_train, Y_train, model="RandomForest"):
+def _objective(
+    trial: optuna.trial.Trial,
+    X_train: np.ndarray,
+    Y_train: np.ndarray,
+    model: str,
+    cv=3,
+    scoring="neg_mean_squared_error",
+):
     if model == "RandomForest":
         n_estimators = trial.suggest_int("n_estimators", 1, 1000, log=True)
         max_depth = trial.suggest_int("max_depth", 1, 32, log=True)
-        reg = RandomForestRegressor(
-            n_estimators=n_estimators, max_depth=max_depth, random_state=42
+        reg = OptunaUtil.get_model(
+            model_name=model, n_estimators=n_estimators, max_depth=max_depth
         )
-    scores = cross_val_score(
-        reg, X_train, Y_train, cv=3, scoring="neg_mean_squared_error"
-    )
-    mse = -scores.mean()  # We want to minimize mean of MSE
-    return mse
+    elif model == "SVR":
+        C = trial.suggest_float("C", 1e-6, 1e2, log=True)
+        gamma = trial.suggest_float("gamma", 1e-6, 1e1, log=True)
+        reg = OptunaUtil.get_model(model_name=model, C=C, gamma=gamma)
+    else:
+        raise ValueError(f"Model {model} not recognized in objective function")
+
+    # Perform cross-validation
+    scores = cross_val_score(reg, X_train, Y_train, cv=cv, scoring=scoring)
+    if scoring == "neg_mean_squared_error":
+        # For MSE, higher negative value is better, so we take negative of mean
+        mse = -scores.mean()
+        return mse
+    else:
+        raise ValueError(f"Unsupported scoring method: {scoring}")
 
 
 # %% Prepare optuna study
@@ -76,38 +95,39 @@ def _objective(trial, X_train, Y_train, model="RandomForest"):
 optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout))
 
 # %% Run optimization
-model = "RandomForest"
-n_trials = 1
+n_trials = 2
 study_info_arr = []
 
-for idx_split, param_split in enumerate(param_list_split[:]):
-    random_state = param_split["random_state"]
-    test_size = param_split["test_size"]
-    print(
-        f"Running split {idx_split} with random_state={random_state}, test_size={test_size}"
+for idx_study, param_study in enumerate(param_study_list[:]):
+    model = param_study.get("model", "RandomForest")
+    random_state = param_study.get("random_state")
+    test_size = param_study.get("test_size")
+    optuna_util = OptunaUtil(
+        model=model,
+        random_state=random_state,
+        test_size=test_size,
+        current_dir=CURRENT_DIR,
     )
 
-    data_handler.split_and_scale(**param_split)
+    print(
+        f"Running study {idx_study}: model={model}, random_state={random_state}, test_size={test_size}"
+    )
+
+    data_handler.split_and_scale(random_state=random_state, test_size=test_size)
     X_train, Y_train = data_handler.get_train()
 
     objective = partial(_objective, X_train=X_train, Y_train=Y_train, model=model)
 
-    base_name = f"{model}_RS-{random_state}_TS-{test_size}".replace(".", "_")
-    study_name = f"study_{base_name}"
-    sampler_name = f"sampler_{base_name}"
-
     # Load or create the sampler
-    if not os.path.exists(f"{CURRENT_DIR}/{sampler_name}.pickle"):
+    if not os.path.exists(optuna_util.sampler_filename):
         sampler = optuna.samplers.CmaEsSampler(seed=42)
     else:
-        with open(f"{CURRENT_DIR}/{sampler_name}.pickle", "rb") as fin:
-            sampler = pickle.load(fin)
+        sampler = optuna_util.load_sampler()
 
     # Load or create the study
-    storage_name = f"sqlite:///{CURRENT_DIR}/storage.db"
     study = optuna.create_study(
-        study_name=study_name,
-        storage=storage_name,
+        study_name=optuna_util.study_name,
+        storage=optuna_util.storage_path,
         load_if_exists=True,
         sampler=sampler,
     )
@@ -116,13 +136,12 @@ for idx_split, param_split in enumerate(param_list_split[:]):
     study.optimize(objective, n_trials=n_trials)
 
     # Save sampler state for reproducibility
-    with open(f"{CURRENT_DIR}/{sampler_name}.pickle", "wb") as fout:
-        pickle.dump(sampler, fout)
+    optuna_util.save_sampler(sampler)
 
     _study_info = dict(
         model=model,
-        **param_split,
-        study_name=study_name,
+        **param_study,
+        study_name=optuna_util.study_name,
         best_param=study.best_params,
         best_value=study.best_value,
     )
@@ -130,3 +149,5 @@ for idx_split, param_split in enumerate(param_list_split[:]):
 
 study_info = pd.DataFrame.from_dict(study_info_arr)
 study_info.to_excel(CURRENT_DIR / "S01_hyperparam_search.xlsx", index=False)
+
+# %%

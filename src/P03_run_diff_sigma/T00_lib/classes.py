@@ -1,8 +1,14 @@
+import os
+from pathlib import Path
 import pickle
+from dataclasses import dataclass
 from datetime import datetime
 
+import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.base import BaseEstimator
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+from sklearn.linear_model import LinearRegression
 from sklearn.metrics import (
     PredictionErrorDisplay,
     mean_absolute_percentage_error,
@@ -10,7 +16,69 @@ from sklearn.metrics import (
     r2_score,
 )
 from sklearn.model_selection import train_test_split
-import matplotlib.pyplot as plt
+from sklearn.multioutput import MultiOutputRegressor
+from sklearn.svm import SVR
+
+
+@dataclass
+class OptunaUtil:
+    model: str
+    random_state: int
+    test_size: float
+    current_dir: Path
+    base_name = ""
+    study_name = ""
+    sampler_name = ""
+    sampler_filename = ""
+    storage_path = ""
+    db_name = "storage"
+
+    def __post_init__(self):
+        names = self.get_names(
+            model=self.model,
+            random_state=self.random_state,
+            test_size=self.test_size,
+        )
+        self.base_name = names["base_name"]
+        self.sampler_name = names["sampler_name"]
+        self.sampler_filename = f"{self.current_dir}/{self.sampler_name}.pickle"
+        self.study_name = names["study_name"]
+        self.storage_path = f"sqlite:///{self.current_dir}/{self.db_name}.db"
+
+    @staticmethod
+    def get_names(model: str, random_state: int, test_size: float) -> str:
+        base_name = f"{model}_RS-{random_state}_TS-{test_size}".replace(".", "_")
+        study_name = f"study_{base_name}"
+        sampler_name = f"sampler_{base_name}"
+        return dict(
+            base_name=base_name, sampler_name=sampler_name, study_name=study_name
+        )
+
+    def load_sampler(self):
+        if not os.path.exists(self.sampler_filename):
+            raise FileNotFoundError(f"Sampler file {self.sampler_filename} not found")
+        with open(self.sampler_filename, "rb") as file:
+            sampler = pickle.load(file)
+        return sampler
+
+    def save_sampler(self, sampler):
+        with open(self.sampler_filename, "wb") as file:
+            pickle.dump(sampler, file)
+
+    @staticmethod
+    def get_model(model_name: str, **params) -> MultiOutputRegressor:
+        if model_name == "RandomForest":
+            base_model = RandomForestRegressor(**params)
+        elif model_name == "GradientBoosting":
+            base_model = GradientBoostingRegressor(**params)
+        elif model_name == "SVR":
+            base_model = SVR()
+        elif model_name == "LinearRegression":
+            base_model = LinearRegression(**params)
+        else:
+            raise ValueError(f"Model {model_name} not recognized")
+        reg = MultiOutputRegressor(base_model)
+        return reg
 
 
 class MyUtil:
