@@ -44,4 +44,4 @@ def choose_latest_study(df: pd.DataFrame) -> pd.Series:
 dfG = df.groupby(by="study_name").apply(choose_latest_study, include_groups=False)
 dfG = dfG.reset_index(drop=False)
 
-dfG.to_excel(f"S02_comb_{dt}.xlsx", index=False)
+dfG.to_excel("S02_combine_study.xlsx", index=False)

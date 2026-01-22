@@ -85,6 +85,7 @@ def optuna_objective_with_data_input(
             coef0=coef0,
             degree=degree,
             shrinking=shrinking,
+            max_iter=int(1e6),
         )
 
         reg = OptunaUtil.get_model(model_name=model, **model_params)

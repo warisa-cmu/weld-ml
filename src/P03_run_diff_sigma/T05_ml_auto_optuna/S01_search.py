@@ -51,10 +51,10 @@ data_handler = DataHandler(
 # Create parameter grid
 param_study_grid = [
     {
-        "random_state": [1, 2],
+        "random_state": [1, 2, 3, 4, 5],
         "test_size": [0.3],
         "model": ["RandomForest", "SVR"],
-        "n_trials": [3],
+        "n_trials": [1],
     },
 ]
 param_study_list = list(ParameterGrid(param_study_grid))

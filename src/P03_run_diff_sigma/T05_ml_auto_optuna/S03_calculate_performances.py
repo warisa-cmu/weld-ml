@@ -23,7 +23,7 @@ print(f"Current Directory: {CURRENT_DIR}")
 print(f"Current Date and Time: {dt}")
 
 # %% Load data
-study_info_filename = "S02_comb_2026-01-22_11-53.xlsx"
+study_info_filename = "S02_combine_study.xlsx"
 study_info = pd.read_excel(CURRENT_DIR / study_info_filename)
 study_info["model_params"] = study_info["model_params"].apply(ast.literal_eval)
 df = pd.read_excel(DATA_DIR / "S02_data_combined_loc.xlsx")
@@ -73,6 +73,6 @@ for idx, study in study_info.iterrows():
     df_arr.append(_df)
 
 df_performances = pd.concat(df_arr, ignore_index=True)
-output_filename = f"S03_perf_{dt}.xlsx"
+output_filename = "S03_calculate_performance.xlsx"
 df_performances.to_excel(CURRENT_DIR / output_filename, index=False)
 print(f"Saved performances to {output_filename}")
