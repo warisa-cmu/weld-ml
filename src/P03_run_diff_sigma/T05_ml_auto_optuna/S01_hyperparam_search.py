@@ -134,4 +134,4 @@ for idx_study, param_study in enumerate(param_study_list[:]):
     study_info_arr.append(_study_info)
 
 study_info = pd.DataFrame.from_dict(study_info_arr)
-study_info.to_excel(CURRENT_DIR / f"S01_{dt}.xlsx", index=False)
+study_info.to_excel(CURRENT_DIR / f"S01_search_{dt}.xlsx", index=False)

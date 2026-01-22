@@ -77,6 +77,6 @@ for idx, study in study_info.iterrows():
     df_arr.append(_df)
 
 df_performances = pd.concat(df_arr, ignore_index=True)
-output_filename = f"S02_performances_{dt}.xlsx"
+output_filename = f"S03_perf_{dt}.xlsx"
 df_performances.to_excel(CURRENT_DIR / output_filename, index=False)
 print(f"Saved performances to {output_filename}")
