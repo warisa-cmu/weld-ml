@@ -11,7 +11,7 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
 
-from P03_run_diff_sigma.T00_lib.classes import DataHandler, MyUtil, RegSwitcher
+from P03_run_diff_sigma.T00_lib.classes_ml import DataHandler, MyUtil, RegSwitcher
 from P03_run_diff_sigma.T00_lib.utils import check_jupyter
 
 if check_jupyter():

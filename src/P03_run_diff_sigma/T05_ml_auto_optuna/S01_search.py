@@ -11,13 +11,12 @@ import pandas as pd
 from sklearn.model_selection import ParameterGrid
 from sklearn.preprocessing import StandardScaler
 
-from P03_run_diff_sigma.T00_lib.classes import (
-    DataHandler,
-    MyUtil,
+from P03_run_diff_sigma.T00_lib.classes_ml import DataHandler, MyUtil
+from P03_run_diff_sigma.T00_lib.utils import check_jupyter
+from P03_run_diff_sigma.T00_lib.optuna_ml import (
     OptunaUtil,
     optuna_objective_with_data_input,
 )
-from P03_run_diff_sigma.T00_lib.utils import check_jupyter
 
 # %% Initialize paths and settings
 if check_jupyter():

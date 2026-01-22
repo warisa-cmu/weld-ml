@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 import pandas as pd
 
-from P03_run_diff_sigma.T00_lib.classes import MyUtil
+from P03_run_diff_sigma.T00_lib.classes_ml import MyUtil
 from P03_run_diff_sigma.T00_lib.utils import check_jupyter
 
 

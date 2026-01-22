@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from P03_run_diff_sigma.T00_lib.classes import MyEval, MyUtil, RegSwitcher
+from P03_run_diff_sigma.T00_lib.classes_ml import MyEval, MyUtil, RegSwitcher
 from P03_run_diff_sigma.T00_lib.utils import check_jupyter
 
 
