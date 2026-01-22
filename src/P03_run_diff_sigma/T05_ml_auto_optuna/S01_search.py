@@ -53,7 +53,7 @@ param_study_grid = [
         "random_state": [1, 2, 3, 4, 5],
         "test_size": [0.3],
         "model": ["XGBR"],
-        "n_trials": [1],
+        "n_trials": [30],
     },
 ]
 param_study_list = list(ParameterGrid(param_study_grid))
