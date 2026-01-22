@@ -18,6 +18,7 @@ from sklearn.metrics import (
     mean_squared_error,
     r2_score,
 )
+from xgboost import XGBRegressor
 from sklearn.model_selection import cross_validate, train_test_split
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.svm import SVR
@@ -159,6 +160,40 @@ def optuna_objective_with_data_input(
             metric=metric,
         )
 
+    elif model == "XGBR":
+        # XGBRegressor
+        n_estimators = trial.suggest_int("n_estimators", 50, 500, log=True)
+        max_depth = trial.suggest_int("max_depth", 1, 12)
+        learning_rate = trial.suggest_float("learning_rate", 1e-4, 1.0, log=True)
+        subsample = trial.suggest_float("subsample", 0.3, 1.0)
+        colsample_bytree = trial.suggest_float("colsample_bytree", 0.3, 1.0)
+        colsample_bylevel = trial.suggest_float("colsample_bylevel", 0.3, 1.0)
+        gamma = trial.suggest_float("gamma", 0.0, 10.0)
+        min_child_weight = trial.suggest_float("min_child_weight", 1e-3, 10.0, log=True)
+        reg_alpha = trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True)
+        reg_lambda = trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True)
+        booster = trial.suggest_categorical("booster", ["gbtree", "dart"])
+        tree_method = trial.suggest_categorical(
+            "tree_method", ["auto", "hist", "approx"]
+        )
+
+        model_params = dict(
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+            learning_rate=learning_rate,
+            subsample=subsample,
+            colsample_bytree=colsample_bytree,
+            colsample_bylevel=colsample_bylevel,
+            gamma=gamma,
+            min_child_weight=min_child_weight,
+            reg_alpha=reg_alpha,
+            reg_lambda=reg_lambda,
+            booster=booster,
+            tree_method=tree_method,
+            random_state=42,
+            verbosity=0,
+        )
+
     else:
         raise ValueError(f"Model {model} not recognized in objective function")
 
@@ -265,6 +300,8 @@ class OptunaUtil:
             base_model = SVR(**params)
         elif model_name == "ElasticNet":
             base_model = ElasticNet(**params)
+        elif model_name == "XGBR":
+            base_model = XGBRegressor(**params)
         else:
             raise ValueError(f"Model {model_name} not recognized")
         reg = MultiOutputRegressor(base_model)
