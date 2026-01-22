@@ -1,14 +1,7 @@
 # %% Imports
-import logging
-import os
-import pickle
-import sys
-from functools import partial
 from pathlib import Path
-from pprint import pp
 import ast
 import pandas as pd
-from sklearn.model_selection import ParameterGrid, cross_val_score
 from sklearn.preprocessing import StandardScaler
 
 from P03_run_diff_sigma.T00_lib.classes import DataHandler, MyUtil, OptunaUtil, MyEval
@@ -30,7 +23,7 @@ print(f"Current Directory: {CURRENT_DIR}")
 print(f"Current Date and Time: {dt}")
 
 # %% Load data
-study_info_filename = "S01_2026-01-22_07-24.xlsx"
+study_info_filename = "S02_comb_2026-01-22_11-53.xlsx"
 study_info = pd.read_excel(CURRENT_DIR / study_info_filename)
 study_info["model_params"] = study_info["model_params"].apply(ast.literal_eval)
 df = pd.read_excel(DATA_DIR / "S02_data_combined_loc.xlsx")
@@ -73,6 +66,9 @@ for idx, study in study_info.iterrows():
         Y_train_pred=Y_train_pred,
         Y_test=Y_test,
         Y_test_pred=Y_test_pred,
+        random_state=random_state,
+        test_size=test_size,
+        model=model,
     )
     df_arr.append(_df)
 
