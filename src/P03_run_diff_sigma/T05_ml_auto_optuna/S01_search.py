@@ -53,8 +53,8 @@ param_study_grid = [
     {
         "random_state": [1, 2, 3, 4, 5],
         "test_size": [0.3],
-        "model": ["SVR"],
-        "n_trials": [100],
+        "model": ["KNR"],
+        "n_trials": [50],
     },
 ]
 param_study_list = list(ParameterGrid(param_study_grid))

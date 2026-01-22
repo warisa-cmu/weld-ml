@@ -9,8 +9,9 @@ import numpy as np
 import optuna
 import pandas as pd
 from sklearn.base import BaseEstimator
+from sklearn.neighbors import KNeighborsRegressor
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import ElasticNet
 from sklearn.metrics import (
     PredictionErrorDisplay,
     mean_absolute_percentage_error,
@@ -54,10 +55,6 @@ def optuna_objective_with_data_input(
             criterion=criterion,
         )
 
-        reg = OptunaUtil.get_model(
-            model_name=model,
-            **model_params,
-        )
     elif model == "SVR":
         kernel = trial.suggest_categorical(
             "kernel", ["rbf", "linear", "poly", "sigmoid"]
@@ -88,11 +85,84 @@ def optuna_objective_with_data_input(
             max_iter=int(1e6),
         )
 
-        reg = OptunaUtil.get_model(model_name=model, **model_params)
+    elif model == "GradientBoosting":
+        n_estimators = trial.suggest_int("n_estimators", 50, 500, log=True)
+        learning_rate = trial.suggest_float("learning_rate", 1e-4, 1.0, log=True)
+        max_depth = trial.suggest_int("max_depth", 1, 10)
+        min_samples_split = trial.suggest_int("min_samples_split", 2, 100)
+        min_samples_leaf = trial.suggest_int("min_samples_leaf", 1, 50)
+        subsample = trial.suggest_float("subsample", 0.5, 1.0)
+        max_features = trial.suggest_categorical(
+            "max_features", ["sqrt", "log2", 0.2, 0.5, 0.8, 1.0]
+        )
+        loss = trial.suggest_categorical(
+            "loss", ["squared_error", "absolute_error", "huber"]
+        )
+
+        model_params = dict(
+            n_estimators=n_estimators,
+            learning_rate=learning_rate,
+            max_depth=max_depth,
+            min_samples_split=min_samples_split,
+            min_samples_leaf=min_samples_leaf,
+            subsample=subsample,
+            max_features=max_features,
+            loss=loss,
+        )
+
+    elif model == "ElasticNet":
+        # ElasticNet: tune regularization and mixing between L1/L2
+        # alpha: overall regularization strength
+        alpha = trial.suggest_float("alpha", 1e-8, 1e2, log=True)
+        # l1_ratio: mix between L1 (1.0) and L2 (0.0)
+        l1_ratio = trial.suggest_float("l1_ratio", 0.0, 1.0)
+        fit_intercept = trial.suggest_categorical("fit_intercept", [True, False])
+        positive = trial.suggest_categorical("positive", [True, False])
+        # max iterations and tolerance
+        max_iter = trial.suggest_int("max_iter", 100, 10000, log=True)
+        tol = trial.suggest_float("tol", 1e-6, 1e-1, log=True)
+        # coordinate descent selection strategy
+        selection = trial.suggest_categorical("selection", ["cyclic", "random"])
+        warm_start = trial.suggest_categorical("warm_start", [True, False])
+
+        model_params = dict(
+            alpha=alpha,
+            l1_ratio=l1_ratio,
+            fit_intercept=fit_intercept,
+            positive=positive,
+            max_iter=max_iter,
+            tol=tol,
+            selection=selection,
+            warm_start=warm_start,
+        )
+
+    elif model == "KNR":
+        # KNeighborsRegressor hyperparameters
+        n_neighbors = trial.suggest_int("n_neighbors", 1, 50)
+        weights = trial.suggest_categorical("weights", ["uniform", "distance"])
+        algorithm = trial.suggest_categorical(
+            "algorithm", ["auto", "ball_tree", "kd_tree", "brute"]
+        )
+        leaf_size = trial.suggest_int("leaf_size", 10, 60)
+        p = trial.suggest_int("p", 1, 2)
+        # metric: allow common metrics; if non-minkowski, `p` is ignored by sklearn
+        metric = trial.suggest_categorical(
+            "metric", ["minkowski", "euclidean", "manhattan", "chebyshev"]
+        )
+
+        model_params = dict(
+            n_neighbors=n_neighbors,
+            weights=weights,
+            algorithm=algorithm,
+            leaf_size=leaf_size,
+            p=p,
+            metric=metric,
+        )
 
     else:
         raise ValueError(f"Model {model} not recognized in objective function")
 
+    reg = OptunaUtil.get_model(model_name=model, **model_params)
     # Perform cross-validation
     scoring = ["neg_mean_squared_error", "neg_mean_absolute_percentage_error", "r2"]
 
@@ -187,12 +257,14 @@ class OptunaUtil:
     def get_model(model_name: str, **params) -> MultiOutputRegressor:
         if model_name == "RandomForest":
             base_model = RandomForestRegressor(**params)
+        elif model_name == "KNR":
+            base_model = KNeighborsRegressor(**params)
         elif model_name == "GradientBoosting":
             base_model = GradientBoostingRegressor(**params)
         elif model_name == "SVR":
             base_model = SVR(**params)
-        elif model_name == "LinearRegression":
-            base_model = LinearRegression(**params)
+        elif model_name == "ElasticNet":
+            base_model = ElasticNet(**params)
         else:
             raise ValueError(f"Model {model_name} not recognized")
         reg = MultiOutputRegressor(base_model)
