@@ -6,17 +6,12 @@ import sys
 from functools import partial
 from pathlib import Path
 from pprint import pp
-
-import optuna
+import ast
 import pandas as pd
-from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import GridSearchCV, ParameterGrid, cross_val_score
-from sklearn.multioutput import MultiOutputRegressor
+from sklearn.model_selection import ParameterGrid, cross_val_score
 from sklearn.preprocessing import StandardScaler
-from sklearn.svm import SVR
 
-from P03_run_diff_sigma.T00_lib.classes import DataHandler, MyUtil
+from P03_run_diff_sigma.T00_lib.classes import DataHandler, MyUtil, OptunaUtil, MyEval
 from P03_run_diff_sigma.T00_lib.utils import check_jupyter
 
 
@@ -35,6 +30,9 @@ print(f"Current Directory: {CURRENT_DIR}")
 print(f"Current Date and Time: {dt}")
 
 # %% Load data
+study_info_filename = "S01_2026-01-22_07-24.xlsx"
+study_info = pd.read_excel(CURRENT_DIR / study_info_filename)
+study_info["model_params"] = study_info["model_params"].apply(ast.literal_eval)
 df = pd.read_excel(DATA_DIR / "S02_data_combined_loc.xlsx")
 print(f"df.shape: {df.shape}")
 
@@ -50,21 +48,23 @@ data_handler = DataHandler(
 )
 
 # %% Load paramlist
+df_arr = []
+for idx, study in study_info.iterrows():
+    random_state = study["random_state"]
+    test_size = study["test_size"]
+    model = study["model"]
+    model_params = study["model_params"]
 
-study_info = pd.read_excel(CURRENT_DIR / "S01_hyperparam_search.xlsx")
-
-for idx, fit in df_fit_select.iterrows():
-    param_split = fit["param_split"]
-    data_handler.split_and_scale(**param_split)
+    print(
+        f"Processing study {idx + 1}/{len(study_info)}: model={model}, random_state={random_state}, test_size={test_size}"
+    )
+    data_handler.split_and_scale(random_state=random_state, test_size=test_size)
 
     X_train, Y_train = data_handler.get_train()
     X_test, Y_test = data_handler.get_test()
 
-    params = fit["params"]
-    reg.set_params(**params)
-
+    reg = OptunaUtil.get_model(model_name=model, **model_params)
     reg.fit(X_train, Y_train)
-
     Y_train_pred = reg.predict(X_train)
     Y_test_pred = reg.predict(X_test)
 
@@ -73,8 +73,10 @@ for idx, fit in df_fit_select.iterrows():
         Y_train_pred=Y_train_pred,
         Y_test=Y_test,
         Y_test_pred=Y_test_pred,
-        id_split=fit["id_split"],
-        id_gs=fit["id_gs"],
-        estimator=fit["estimator"],
     )
     df_arr.append(_df)
+
+df_performances = pd.concat(df_arr, ignore_index=True)
+output_filename = f"S02_performances_{dt}.xlsx"
+df_performances.to_excel(CURRENT_DIR / output_filename, index=False)
+print(f"Saved performances to {output_filename}")

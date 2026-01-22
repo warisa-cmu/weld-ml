@@ -1,10 +1,12 @@
 import os
-from pathlib import Path
 import pickle
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
+import optuna
 import pandas as pd
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
@@ -15,9 +17,111 @@ from sklearn.metrics import (
     mean_squared_error,
     r2_score,
 )
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import cross_validate, train_test_split
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.svm import SVR
+
+
+def optuna_objective_with_data_input(
+    trial: optuna.trial.Trial,
+    X_train: np.ndarray,
+    Y_train: np.ndarray,
+    model: str,
+    cv=3,
+    objective_score="mse_mean",
+):
+    if model == "RandomForest":
+        # ! For faster tuning
+        n_estimators = trial.suggest_int("n_estimators", 50, 100, log=True)
+        max_depth = trial.suggest_int("max_depth", 3, 128, log=True)
+        min_samples_split = trial.suggest_int("min_samples_split", 2, 50)
+        min_samples_leaf = trial.suggest_int("min_samples_leaf", 1, 50)
+        max_features = trial.suggest_categorical(
+            "max_features", ["sqrt", "log2", 0.2, 0.5, 0.8, 1.0]
+        )
+        bootstrap = trial.suggest_categorical("bootstrap", [True, False])
+        criterion = trial.suggest_categorical(
+            "criterion", ["squared_error", "absolute_error"]
+        )
+
+        model_params = dict(
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+            min_samples_split=min_samples_split,
+            min_samples_leaf=min_samples_leaf,
+            max_features=max_features,
+            bootstrap=bootstrap,
+            criterion=criterion,
+        )
+
+        reg = OptunaUtil.get_model(
+            model_name=model,
+            **model_params,
+        )
+    elif model == "SVR":
+        kernel = trial.suggest_categorical(
+            "kernel", ["rbf", "linear", "poly", "sigmoid"]
+        )
+        C = trial.suggest_float("C", 1e-6, 1e6, log=True)
+        epsilon = trial.suggest_float("epsilon", 1e-6, 1.0, log=True)
+        # gamma: allow 'scale'/'auto' or numeric
+        gamma_choice = trial.suggest_categorical(
+            "gamma_choice", ["scale", "auto", "float"]
+        )
+        if gamma_choice == "float":
+            gamma = trial.suggest_float("gamma", 1e-6, 1e1, log=True)
+        else:
+            gamma = gamma_choice
+        coef0 = trial.suggest_float("coef0", -1.0, 1.0)
+        degree = trial.suggest_int("degree", 2, 5) if kernel == "poly" else 3
+        shrinking = trial.suggest_categorical("shrinking", [True, False])
+
+        # Prepare model parameters
+        model_params = dict(
+            kernel=kernel,
+            C=C,
+            gamma=gamma,
+            epsilon=epsilon,
+            coef0=coef0,
+            degree=degree,
+            shrinking=shrinking,
+        )
+
+        reg = OptunaUtil.get_model(model_name=model, **model_params)
+
+    else:
+        raise ValueError(f"Model {model} not recognized in objective function")
+
+    # Perform cross-validation
+    scoring = ["neg_mean_squared_error", "neg_mean_absolute_percentage_error", "r2"]
+
+    cv_results = cross_validate(
+        reg,
+        X_train,
+        Y_train,
+        cv=cv,
+        scoring=scoring,
+        return_train_score=False,
+    )
+
+    scores = dict(
+        mse_mean=-cv_results["test_neg_mean_squared_error"].mean(),
+        mse_std=cv_results["test_neg_mean_squared_error"].std(),
+        mape_mean=-cv_results["test_neg_mean_absolute_percentage_error"].mean(),
+        mape_std=cv_results["test_neg_mean_absolute_percentage_error"].std(),
+        r2_mean=cv_results["test_r2"].mean(),
+        r2_std=cv_results["test_r2"].std(),
+    )
+
+    # Store scores and model parameters in trial user attributes
+    trial.set_user_attr(key="scores", value=scores)
+    trial.set_user_attr(key="model_params", value=model_params)
+
+    # Return the objective score
+    if objective_score == "mse_mean":
+        return scores["mse_mean"]
+    else:
+        raise ValueError(f"Unsupported objective_score: {objective_score}")
 
 
 @dataclass
