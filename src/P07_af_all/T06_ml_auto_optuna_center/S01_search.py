@@ -60,7 +60,7 @@ param_study_grid = [
             # "ElasticNet",
             # "XGBR",
         ],
-        "n_trials": [30],
+        "n_trials": [3],
     },
 ]
 param_study_list = list(ParameterGrid(param_study_grid))
@@ -100,7 +100,11 @@ for idx_study, param_study in enumerate(param_study_list[:]):
 
     # Define objective function with fixed data
     optuna_objective_include_input = partial(
-        optuna_objective_with_data_input, X_train=X_train, Y_train=Y_train, model=model
+        optuna_objective_with_data_input,
+        X_train=X_train,
+        Y_train=Y_train,
+        model=model,
+        objective_score="center",
     )
 
     # Load or create the sampler
