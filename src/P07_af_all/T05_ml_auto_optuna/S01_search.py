@@ -60,7 +60,7 @@ param_study_grid = [
             "ElasticNet",
             "XGBR",
         ],
-        "n_trials": [20],
+        "n_trials": [1],
     },
 ]
 param_study_list = list(ParameterGrid(param_study_grid))
