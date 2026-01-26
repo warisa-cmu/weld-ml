@@ -216,10 +216,8 @@ def optuna_objective_with_data_input(
     # Return the objective score
     if objective_score == "mse_mean":
         return scores["mse_mean"]
-    elif objective_score == "center":
-        if len(cv_results["test_r2"]) != 3:
-            raise Exception("This option needs 3 Ys")
-        return -cv_results["test_r2"][2]
+    if objective_score == "r2":
+        return -scores["r2_mean"]  # Minimize negative R2
     else:
         raise ValueError(f"Unsupported objective_score: {objective_score}")
 

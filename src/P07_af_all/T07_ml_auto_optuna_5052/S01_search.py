@@ -42,8 +42,8 @@ _X = df.iloc[:, :-3].values
 # Extract target variables (last three columns)
 _dfY = df.iloc[:, -3:]
 
-# Need only center prediction
-_Y = _dfY.iloc[:, [2]].values
+# Need only 5052 prediction
+_Y = _dfY.iloc[:, [0]].values
 
 print(f"_X.shape: {_X.shape}")
 print(f"_Y.shape: {_Y.shape}")
@@ -60,13 +60,13 @@ param_study_grid = [
         "test_size": [0.3],
         "model": [
             "RandomForest",
-            "KNR",
+            # "KNR",
             "GradientBoosting",
-            "SVR",
-            "ElasticNet",
-            "XGBR",
+            # "SVR",
+            # "ElasticNet",
+            # "XGBR",
         ],
-        "n_trials": [200],
+        "n_trials": [100],
     },
 ]
 param_study_list = list(ParameterGrid(param_study_grid))
