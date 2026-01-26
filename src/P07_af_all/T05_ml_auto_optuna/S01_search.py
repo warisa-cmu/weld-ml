@@ -58,9 +58,9 @@ param_study_grid = [
             "GradientBoosting",
             "SVR",
             "ElasticNet",
-            # "XGBR",
+            "XGBR",
         ],
-        "n_trials": [10],
+        "n_trials": [20],
     },
 ]
 param_study_list = list(ParameterGrid(param_study_grid))
