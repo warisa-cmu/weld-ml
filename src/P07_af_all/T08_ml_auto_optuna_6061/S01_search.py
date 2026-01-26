@@ -60,13 +60,13 @@ param_study_grid = [
         "test_size": [0.3],
         "model": [
             "RandomForest",
-            # "KNR",
+            "KNR",
             "GradientBoosting",
-            # "SVR",
-            # "ElasticNet",
-            # "XGBR",
+            "SVR",
+            "ElasticNet",
+            "XGBR",
         ],
-        "n_trials": [100],
+        "n_trials": [200],
     },
 ]
 param_study_list = list(ParameterGrid(param_study_grid))
