@@ -25,6 +25,7 @@ dependencies = [
     "seaborn>=0.13.2",
     "shap>=0.49.1",
     "tabpfn>=6.3.1",
+    "tabpfn-extensions[all,interpretibility]",
     "tensorboard>=2.19.0",
     "torch>=2.6.0",
     "torchinfo>=1.8.0",
@@ -34,3 +35,6 @@ dependencies = [
     "tsfresh>=0.21.0",
     "xgboost>=3.1.2",
 ]
+
+[tool.uv.sources]
+tabpfn-extensions = { git = "https://github.com/PriorLabs/tabpfn-extensions.git" }
