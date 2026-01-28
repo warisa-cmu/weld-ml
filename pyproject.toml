@@ -1,3 +1,16 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# Explicitly list package directories
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["run1*", "src*"]
+namespaces = false
+
 [project]
 name = "weld-ml"
 version = "0.1.0"

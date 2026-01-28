@@ -5,13 +5,14 @@ from pathlib import Path
 
 import numpy as np
 import optuna
-from sklearn.neighbors import KNeighborsRegressor
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.linear_model import ElasticNet
-from xgboost import XGBRegressor
 from sklearn.model_selection import cross_validate
 from sklearn.multioutput import MultiOutputRegressor
+from sklearn.neighbors import KNeighborsRegressor
 from sklearn.svm import SVR
+from sklearn.tree import DecisionTreeRegressor
+from xgboost import XGBRegressor
 
 
 def optuna_objective_with_data_input(
@@ -19,12 +20,12 @@ def optuna_objective_with_data_input(
     X_train: np.ndarray,
     Y_train: np.ndarray,
     model: str,
-    cv=3,
-    objective_score="mse_mean",
+    cv=4,
+    objective_score="r2",
 ):
-    if model == "RandomForest":
-        # ! For faster tuning
-        n_estimators = trial.suggest_int("n_estimators", 50, 100, log=True)
+    if model == "RFR":
+        # RandomForestRegressor hyperparameters
+        n_estimators = trial.suggest_int("n_estimators", 50, 500, log=True)
         max_depth = trial.suggest_int("max_depth", 3, 128, log=True)
         min_samples_split = trial.suggest_int("min_samples_split", 2, 50)
         min_samples_leaf = trial.suggest_int("min_samples_leaf", 1, 50)
@@ -44,9 +45,11 @@ def optuna_objective_with_data_input(
             max_features=max_features,
             bootstrap=bootstrap,
             criterion=criterion,
+            random_state=42,
         )
 
     elif model == "SVR":
+        # Support Vector Regressor hyperparameters
         kernel = trial.suggest_categorical(
             "kernel", ["rbf", "linear", "poly", "sigmoid"]
         )
@@ -73,10 +76,11 @@ def optuna_objective_with_data_input(
             coef0=coef0,
             degree=degree,
             shrinking=shrinking,
-            max_iter=int(1e6),
+            max_iter=int(5e5),
         )
 
-    elif model == "GradientBoosting":
+    elif model == "GBR":
+        # GradientBoostingRegressor hyperparameters
         n_estimators = trial.suggest_int("n_estimators", 50, 500, log=True)
         learning_rate = trial.suggest_float("learning_rate", 1e-4, 1.0, log=True)
         max_depth = trial.suggest_int("max_depth", 1, 10)
@@ -99,9 +103,10 @@ def optuna_objective_with_data_input(
             subsample=subsample,
             max_features=max_features,
             loss=loss,
+            random_state=42,
         )
 
-    elif model == "ElasticNet":
+    elif model == "EN":
         # ElasticNet: tune regularization and mixing between L1/L2
         # alpha: overall regularization strength
         alpha = trial.suggest_float("alpha", 1e-8, 1e2, log=True)
@@ -125,6 +130,7 @@ def optuna_objective_with_data_input(
             tol=tol,
             selection=selection,
             warm_start=warm_start,
+            random_state=42,
         )
 
     elif model == "KNR":
@@ -151,7 +157,7 @@ def optuna_objective_with_data_input(
         )
 
     elif model == "XGBR":
-        # XGBRegressor
+        # Hyperparameters for XGBoost Regressor
         n_estimators = trial.suggest_int("n_estimators", 50, 500, log=True)
         max_depth = trial.suggest_int("max_depth", 1, 12)
         learning_rate = trial.suggest_float("learning_rate", 1e-4, 1.0, log=True)
@@ -182,6 +188,45 @@ def optuna_objective_with_data_input(
             tree_method=tree_method,
             random_state=42,
             verbosity=0,
+        )
+
+    elif model == "DTR":
+        # DecisionTreeRegressor hyperparameters
+        criterion = trial.suggest_categorical(
+            "criterion", ["squared_error", "friedman_mse", "absolute_error"]
+        )
+        splitter = trial.suggest_categorical("splitter", ["best", "random"])
+        max_depth = trial.suggest_categorical(
+            "max_depth", [None, 2, 3, 4, 6, 8, 12, 16, 24, 32]
+        )
+        min_samples_split = trial.suggest_int("min_samples_split", 2, 50)
+        min_samples_leaf = trial.suggest_int("min_samples_leaf", 1, 50)
+        min_weight_fraction_leaf = trial.suggest_float(
+            "min_weight_fraction_leaf", 0.0, 0.5
+        )
+        max_features = trial.suggest_categorical(
+            "max_features", [None, "sqrt", "log2", 0.2, 0.5, 0.8, 1.0]
+        )
+        max_leaf_nodes = trial.suggest_categorical(
+            "max_leaf_nodes", [None, 20, 50, 100, 200, 500]
+        )
+        min_impurity_decrease = trial.suggest_float(
+            "min_impurity_decrease", 1e-7, 1e-2, log=True
+        )
+        ccp_alpha = trial.suggest_float("ccp_alpha", 1e-7, 1e-2, log=True)
+
+        model_params = dict(
+            criterion=criterion,
+            splitter=splitter,
+            max_depth=max_depth,
+            min_samples_split=min_samples_split,
+            min_samples_leaf=min_samples_leaf,
+            min_weight_fraction_leaf=min_weight_fraction_leaf,
+            max_features=max_features,
+            max_leaf_nodes=max_leaf_nodes,
+            min_impurity_decrease=min_impurity_decrease,
+            ccp_alpha=ccp_alpha,
+            random_state=42,
         )
 
     else:
@@ -282,18 +327,20 @@ class OptunaUtil:
 
     @staticmethod
     def get_model(model_name: str, **params) -> MultiOutputRegressor:
-        if model_name == "RandomForest":
+        if model_name == "RFR":
             base_model = RandomForestRegressor(**params)
         elif model_name == "KNR":
             base_model = KNeighborsRegressor(**params)
-        elif model_name == "GradientBoosting":
+        elif model_name == "GBR":
             base_model = GradientBoostingRegressor(**params)
         elif model_name == "SVR":
             base_model = SVR(**params)
-        elif model_name == "ElasticNet":
+        elif model_name == "EN":
             base_model = ElasticNet(**params)
         elif model_name == "XGBR":
             base_model = XGBRegressor(**params)
+        elif model_name == "DTR":
+            base_model = DecisionTreeRegressor(**params)
         else:
             raise ValueError(f"Model {model_name} not recognized")
         reg = MultiOutputRegressor(base_model)

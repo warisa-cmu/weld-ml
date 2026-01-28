@@ -10,9 +10,9 @@ import pandas as pd
 from sklearn.model_selection import ParameterGrid
 from sklearn.preprocessing import StandardScaler
 
-from P06_no_af.T00_lib.classes_ml import DataHandler, MyUtil
-from P06_no_af.T00_lib.utils import check_jupyter
-from P06_no_af.T00_lib.optuna_ml import (
+from run1.lib.classes_ml import DataHandler, MyUtil
+from run1.lib.utils import check_jupyter
+from run1.lib.optuna_ml import (
     OptunaUtil,
     optuna_objective_with_data_input,
 )
@@ -20,34 +20,37 @@ from P06_no_af.T00_lib.optuna_ml import (
 # %% Initialize paths and settings
 if check_jupyter():
     BASE_DIR = Path.cwd()  # Current directory of the running file
-    DATA_DIR = BASE_DIR.parent.parent / "P03_run_diff_sigma" / "T02_combine_features"
+    ROOT_DIR = BASE_DIR.parent.parent.parent
+    DATA_DIR = ROOT_DIR / "run1" / "data"
     CURRENT_DIR = BASE_DIR
 else:
     BASE_DIR = Path.cwd()  # Base directory of the project
-    DATA_DIR = BASE_DIR / "src/P03_run_diff_sigma/T02_combine_features"
+    ROOT_DIR = BASE_DIR
+    DATA_DIR = ROOT_DIR / "run1" / "data"
     CURRENT_DIR = Path(__file__).resolve().parent
 
 dt = MyUtil.get_dt()
 print(f"Current Directory: {CURRENT_DIR}")
+print(f"Data Directory: {DATA_DIR}")
 print(f"Current Date and Time: {dt}")
 
 # %% Load data
-df = pd.read_excel(DATA_DIR / "S02_data_combined_loc.xlsx")
-print(f"df.shape: {df.shape}")
+_df = pd.read_excel(DATA_DIR / "S02_data_exp.xlsx")
+print(f"df.shape: {_df.shape}")
 
 # Select columns for features and targets
-colsY = [c for c in df.columns if re.search(r"stress_value", c)]
-colsX = [c for c in df.columns if c in ["R", "W", "D", "position"]]
-dfY = df[colsY]
-dfX = df[colsX]
+colsY = [c for c in _df.columns if re.search(r"stress_value", c)]
+colsX = [c for c in _df.columns if c in ["R", "W", "D", "position"]]
+_dfY = _df[colsY]
+_dfX = _df[colsX]
 print("Selected feature columns:", colsX)
 print("Selected target columns:", colsY)
-print(f"dfX.shape: {dfX.shape}")
-print(f"dfY.shape: {dfY.shape}")
+print(f"dfX.shape: {_dfX.shape}")
+print(f"dfY.shape: {_dfY.shape}")
 
-# Extract features and targets
-_X = dfX.values
-_Y = dfY.values
+# %% Extract features and targets
+_X = _dfX.values
+_Y = _dfY.values
 print(f"_X.shape: {_X.shape}")
 print(f"_Y.shape: {_Y.shape}")
 
@@ -62,11 +65,12 @@ param_study_grid = [
         "random_state": [1, 2, 3, 4, 5],
         "test_size": [0.3],
         "model": [
-            "RandomForest",
-            "KNR",
-            "GradientBoosting",
+            "EN",
             "SVR",
-            "ElasticNet",
+            "KNR",
+            "DTR",
+            "RFR",
+            "GBR",
             "XGBR",
         ],
         "n_trials": [1],
