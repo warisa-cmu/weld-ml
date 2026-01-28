@@ -98,7 +98,49 @@ class MyEval:
         return mse, mape, r2
 
     @classmethod
-    def eval(cls, Y_train, Y_test, Y_train_pred, Y_test_pred, **kwargs):
+    def eval_single(cls, Y_true, Y_pred, prefix="", **kwargs):
+        # Add underscore if prefix is not empty and does not end with underscore
+        if prefix != "" and not prefix.endswith("_"):
+            prefix += "_"
+
+        data_arr = []
+        for i in range(0, Y_true.shape[1]):
+            mse, mape, r2 = cls.eval_perf(y_true=Y_true[:, i], y_pred=Y_pred[:, i])
+
+            data = {
+                **kwargs,
+                "Y": f"Y-{i + 1}",
+                f"{prefix}MSE": mse,
+                f"{prefix}MAPE": mape,
+                f"{prefix}R2": r2,
+            }
+            data_arr.append(data)
+
+        # Evaluate for all Y together
+        mse, mape, r2 = cls.eval_perf(y_true=Y_true, y_pred=Y_pred)
+        data = {
+            **kwargs,
+            "Y": "Y-All",
+            f"{prefix}MSE": mse,
+            f"{prefix}MAPE": mape,
+            f"{prefix}R2": r2,
+        }
+        data_arr.append(data)
+        df_eval = pd.DataFrame.from_dict(data_arr)
+        return df_eval
+
+    @classmethod
+    def eval(
+        cls, Y_train=None, Y_test=None, Y_train_pred=None, Y_test_pred=None, **kwargs
+    ):
+        if (
+            Y_train is None
+            or Y_train_pred is None
+            or Y_test is None
+            or Y_test_pred is None
+        ):
+            raise Exception("Y_train, Y_train_pred, Y_test, Y_test_pred cannot be None")
+
         data_arr = []
         for i in range(0, Y_train.shape[1]):
             mse_train, mape_train, r2_train = cls.eval_perf(
@@ -120,6 +162,7 @@ class MyEval:
             }
             data_arr.append(data)
 
+        # Evaluate for all Y together
         mse_train, mape_train, r2_train = cls.eval_perf(
             y_true=Y_train, y_pred=Y_train_pred
         )
