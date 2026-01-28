@@ -33,7 +33,7 @@ class MyUtil:
 
 
 class DataHandler:
-    def __init__(self, _X, _Y, scalerX, scalerY):
+    def __init__(self, _X, _Y, scalerX, scalerY, colsX=None, colsY=None):
         self._X = _X
         self._Y = _Y
         self.scalerX = scalerX
@@ -42,6 +42,17 @@ class DataHandler:
         self.X_test = None
         self.Y_train = None
         self.Y_test = None
+        self.colsX = colsX
+        self.colsY = colsY
+
+    def get_columns(self):
+        colsX = self.colsX
+        colsY = self.colsY
+        if colsX is None:
+            colsX = [f"X-{i + 1}" for i in range(self._X.shape[1])]
+        if colsY is None:
+            colsY = [f"Y-{i + 1}" for i in range(self._Y.shape[1])]
+        return colsX, colsY
 
     def split_and_scale(self, test_size, random_state):
         # Handle the case when test_size is 0.0 (no test set)
@@ -69,10 +80,20 @@ class DataHandler:
         self.Y_train = self.scalerY.fit_transform(_Y_train)
         self.Y_test = self.scalerY.transform(_Y_test)
 
-    def get_train(self):
+    def get_train(self, as_dataframe=False):
+        if as_dataframe:
+            colsX, colsY = self.get_columns()
+            return pd.DataFrame(self.X_train, columns=colsX), pd.DataFrame(
+                self.Y_train, columns=colsY
+            )
         return self.X_train, self.Y_train
 
-    def get_test(self):
+    def get_test(self, as_dataframe=False):
+        if as_dataframe:
+            colsX, colsY = self.get_columns()
+            return pd.DataFrame(self.X_test, columns=colsX), pd.DataFrame(
+                self.Y_test, columns=colsY
+            )
         return self.X_test, self.Y_test
 
 
