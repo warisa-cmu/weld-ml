@@ -7,10 +7,9 @@ from sklearn.preprocessing import StandardScaler
 
 from run1.lib.classes_ml import (
     DataHandler,
-    MyUtil,
     MyEval,
 )
-from run1.lib.utils import check_jupyter
+from run1.lib.utils import check_jupyter, MyUtil
 from run1.lib.optuna_ml import (
     OptunaUtil,
 )

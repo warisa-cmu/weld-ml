@@ -9,8 +9,8 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
 from tabpfn import TabPFNRegressor
 
-from run1.lib.classes_ml import DataHandler, MyEval, MyUtil
-from run1.lib.utils import check_jupyter
+from run1.lib.classes_ml import DataHandler, MyEval
+from run1.lib.utils import check_jupyter, MyUtil
 
 # %% Initialize paths and settings
 if check_jupyter():

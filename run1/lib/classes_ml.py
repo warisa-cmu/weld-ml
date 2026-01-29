@@ -1,6 +1,3 @@
-import pickle
-from datetime import datetime
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -13,23 +10,6 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
-
-
-class MyUtil:
-    @staticmethod
-    def save_data(filename, data):
-        with open(filename, "wb") as file:
-            pickle.dump(data, file)
-
-    @staticmethod
-    def load_data(filename):
-        with open(filename, "rb") as file:
-            data = pickle.load(file)
-        return data
-
-    @staticmethod
-    def get_dt():
-        return datetime.now().strftime("%Y-%m-%d_%H-%M")
 
 
 class DataHandler:

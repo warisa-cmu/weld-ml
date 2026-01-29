@@ -10,8 +10,8 @@ import pandas as pd
 from sklearn.model_selection import ParameterGrid
 from sklearn.preprocessing import StandardScaler
 
-from run1.lib.classes_ml import DataHandler, MyUtil
-from run1.lib.utils import check_jupyter
+from run1.lib.classes_ml import DataHandler
+from run1.lib.utils import check_jupyter, MyUtil
 from run1.lib.optuna_ml import (
     OptunaUtil,
     optuna_objective_with_data_input,

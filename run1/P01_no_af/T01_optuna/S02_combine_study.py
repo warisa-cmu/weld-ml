@@ -3,8 +3,7 @@ import os
 from pathlib import Path
 import pandas as pd
 
-from run1.lib.classes_ml import MyUtil
-from run1.lib.utils import check_jupyter
+from run1.lib.utils import check_jupyter, MyUtil
 
 
 # %% Initialize paths and settings
