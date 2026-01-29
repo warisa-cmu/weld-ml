@@ -70,7 +70,7 @@ param_study_grid = [
             "GBR",
             "XGBR",
         ],
-        "n_trials": [1],
+        "n_trials": [50],
     },
 ]
 param_study_list = list(ParameterGrid(param_study_grid))
