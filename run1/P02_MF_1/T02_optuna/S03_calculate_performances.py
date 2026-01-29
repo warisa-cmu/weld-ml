@@ -13,24 +13,20 @@ from run1.lib.utils import check_jupyter, MyUtil
 from run1.lib.optuna_ml import (
     OptunaUtil,
 )
+from run1.lib.directory import get_directory
 
 
 # %% Initialize paths and settings
 if check_jupyter():
-    BASE_DIR = Path.cwd()  # Current directory of the running file
-    ROOT_DIR = BASE_DIR.parent.parent.parent
-    DATA_DIR = ROOT_DIR / "run1" / "P02_MF_1" / "T01_af_features"
-    CURRENT_DIR = BASE_DIR
+    CURRENT_DIR = Path.cwd()  # Current directory of the running file
 else:
-    BASE_DIR = Path.cwd()  # Base directory of the project
-    ROOT_DIR = BASE_DIR
-    DATA_DIR = ROOT_DIR / "run1" / "P02_MF_1" / "T01_af_features"
     CURRENT_DIR = Path(__file__).resolve().parent
 
+# Get data directory
+directory = get_directory(CURRENT_DIR, verbose=True)
+DATA_PATH = directory["DATA_PATH"]
 
 dt = MyUtil.get_dt()
-print(f"Current Directory: {CURRENT_DIR}")
-print(f"Data Directory: {DATA_DIR}")
 print(f"Current Date and Time: {dt}")
 
 # %% Load data
@@ -38,7 +34,7 @@ study_info_filename = "S02_combine_study.xlsx"
 study_info = pd.read_excel(CURRENT_DIR / study_info_filename)
 study_info["model_params"] = study_info["model_params"].apply(ast.literal_eval)
 
-_df = pd.read_excel(DATA_DIR / "S01_combined_data.xlsx")
+_df = pd.read_excel(DATA_PATH)
 print(f"df.shape: {_df.shape}")
 
 # Select columns for features and targets

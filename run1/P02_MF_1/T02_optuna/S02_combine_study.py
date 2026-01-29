@@ -8,19 +8,12 @@ from run1.lib.utils import check_jupyter, MyUtil
 
 # %% Initialize paths and settings
 if check_jupyter():
-    BASE_DIR = Path.cwd()  # Current directory of the running file
-    ROOT_DIR = BASE_DIR.parent.parent.parent
-    DATA_DIR = ROOT_DIR / "run1" / "P02_MF_1" / "T01_af_features"
-    CURRENT_DIR = BASE_DIR
+    CURRENT_DIR = Path.cwd()  # Current directory of the running file
 else:
-    BASE_DIR = Path.cwd()  # Base directory of the project
-    ROOT_DIR = BASE_DIR
-    DATA_DIR = ROOT_DIR / "run1" / "P02_MF_1" / "T01_af_features"
     CURRENT_DIR = Path(__file__).resolve().parent
 
 dt = MyUtil.get_dt()
 print(f"Current Directory: {CURRENT_DIR}")
-print(f"Data Directory: {DATA_DIR}")
 print(f"Current Date and Time: {dt}")
 
 # %% Load data
