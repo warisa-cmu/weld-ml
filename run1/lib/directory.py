@@ -8,8 +8,9 @@ def get_directory(current_dir, verbose=False):
     if check_jupyter():
         # Use regex to find the weld-ml directory in the current path
         match = re.search(r"(weld-ml)", str(current_dir))
+
         # If found, set BASE_DIR and ROOT_DIR accordingly
-        if match:
+        if match is not None:
             BASE_DIR = Path(str(current_dir)[: match.end()])
             ROOT_DIR = BASE_DIR
         else:
@@ -35,7 +36,7 @@ def get_directory(current_dir, verbose=False):
             STUDY_TABPFN_DIR=STUDY_TABPFN_DIR,
             STUDY_TABPFN_PATH=STUDY_TABPFN_PATH,
         )
-    if "P03_MF_2" in str(current_dir):
+    elif "P03_MF_2" in str(current_dir):
         DATA_DIR = ROOT_DIR / "run1" / "P03_MF_2" / "T01_af_features"
         DATA_PATH = DATA_DIR / "S01_combined_data.xlsx"
         STUDY_ML_DIR = ROOT_DIR / "run1" / "P03_MF_2" / "T02_optuna"
@@ -53,7 +54,7 @@ def get_directory(current_dir, verbose=False):
             STUDY_TABPFN_PATH=STUDY_TABPFN_PATH,
         )
     else:
-        raise ValueError(f"Cannot determine data directory for {current_dir}")
+        raise ValueError(f"Cannot determine directory for {current_dir}")
 
     if verbose:
         for key, value in directory.items():
