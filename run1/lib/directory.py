@@ -53,6 +53,23 @@ def get_directory(current_dir, verbose=False):
             STUDY_TABPFN_DIR=STUDY_TABPFN_DIR,
             STUDY_TABPFN_PATH=STUDY_TABPFN_PATH,
         )
+    elif "P04_MF2" in str(current_dir):
+        DATA_DIR = ROOT_DIR / "run1" / "P04_MF2" / "T01_af_features"
+        DATA_PATH = DATA_DIR / "S01_combined_data.xlsx"
+        STUDY_ML_DIR = ROOT_DIR / "run1" / "P04_MF2" / "T02_optuna"
+        STUDY_ML_PATH = STUDY_ML_DIR / "S02_combine_study.xlsx"
+        STUDY_TABPFN_DIR = ROOT_DIR / "run1" / "P04_MF2" / "T11_tabPFN"
+        STUDY_TABPFN_PATH = STUDY_TABPFN_DIR / "S01_calculate_performance.xlsx"
+
+        directory = dict(
+            ROOT_DIR=ROOT_DIR,
+            DATA_DIR=DATA_DIR,
+            DATA_PATH=DATA_PATH,
+            STUDY_ML_DIR=STUDY_ML_DIR,
+            STUDY_ML_PATH=STUDY_ML_PATH,
+            STUDY_TABPFN_DIR=STUDY_TABPFN_DIR,
+            STUDY_TABPFN_PATH=STUDY_TABPFN_PATH,
+        )
     else:
         raise ValueError(f"Cannot determine directory for {current_dir}")
 
