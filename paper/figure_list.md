@@ -8,3 +8,5 @@
 
 - Residual stress
   - `src\P02_data\T05_EA\S05_residual_stress_analyze_paper.ipynb`
+  - Experiment
+    - `src\P02_data\T05_EA\S04_paper.ipynb`
